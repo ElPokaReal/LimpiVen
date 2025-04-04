@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router';
-import { Chrome as Home, Calendar, Bell, User, MapPin } from 'lucide-react-native';
+import { House , Calendar, Bell, User, MapPin } from 'lucide-react-native';
 
 export default function TabLayout() {
   return (
@@ -20,7 +20,7 @@ export default function TabLayout() {
         name="index"
         options={{
           title: 'Inicio',
-          tabBarIcon: ({ color, size }) => <Home size={size} color={color} />,
+          tabBarIcon: ({ color, size }) => <House size={size} color={color} />,
         }}
       />
       <Tabs.Screen
