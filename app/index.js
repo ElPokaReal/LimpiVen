@@ -1,6 +1,8 @@
-import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image, Dimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
+
+const { width, height } = Dimensions.get('window');
 
 export default function Home() {
   const router = useRouter();
@@ -8,7 +10,7 @@ export default function Home() {
   return (
     <View style={styles.container}>
       <LinearGradient
-        colors={['rgba(255,255,255,0.9)', 'rgba(255,255,255,0.6)']}
+        colors={['rgba(255, 255, 255, 0.9)', 'rgba(255,255,255,0.6)']}
         style={styles.gradient}
       />
       
@@ -46,7 +48,11 @@ export default function Home() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    width: width * 0.9,
+    maxWidth: 500,
+    alignSelf: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#ffffff',
   },
   backgroundImage: {
     position: 'absolute',
