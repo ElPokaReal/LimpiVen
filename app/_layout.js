@@ -1,23 +1,42 @@
-import { useEffect } from 'react';
 import { Stack } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
-import { useFrameworkReady } from '../hooks/useFrameworkReady';
+import { theme } from './theme';
 
 export default function RootLayout() {
-  useFrameworkReady();
-
   return (
-    <>
-      <Stack screenOptions={{
-        headerShown: false,
+    <Stack
+      screenOptions={{
+        headerStyle: {
+          backgroundColor: theme.colors.primary,
+        },
+        headerTintColor: theme.colors.surface,
+        headerTitleStyle: {
+          ...theme.typography.h3,
+          color: theme.colors.surface,
+        },
+        headerShadowVisible: false,
+        headerBackTitleVisible: false,
+        contentStyle: {
+          backgroundColor: theme.colors.background,
+        },
         animation: 'slide_from_right',
-      }}>
-        <Stack.Screen name="index" />
-        <Stack.Screen name="auth" />
-        <Stack.Screen name="employee-signup" />
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      </Stack>
-      <StatusBar style="light" backgroundColor="#6200EE" />
-    </>
+      }}
+    >
+      <Stack.Screen 
+        name="index" 
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen 
+        name="auth" 
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen 
+        name="employee-signup" 
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen 
+        name="(tabs)" 
+        options={{ headerShown: false }}
+      />
+    </Stack>
   );
 }

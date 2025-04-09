@@ -1,6 +1,7 @@
-import { View, Text, StyleSheet, TouchableOpacity, TextInput } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
-import { ArrowLeft } from 'lucide-react-native';
+import { ArrowLeft, Mail, Lock } from 'lucide-react-native';
+import { theme } from './theme';
 
 export default function Auth() {
   const router = useRouter();
@@ -10,13 +11,17 @@ export default function Auth() {
   };
 
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView 
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      style={styles.container}
+    >
       <View style={styles.header}>
         <TouchableOpacity 
           style={styles.backButton}
           onPress={() => router.back()}
+          activeOpacity={0.8}
         >
-          <ArrowLeft size={24} color="#fff" />
+          <ArrowLeft size={24} color={theme.colors.surface} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Iniciar Sesión</Text>
       </View>
@@ -25,26 +30,35 @@ export default function Auth() {
         <View style={styles.form}>
           <View style={styles.inputContainer}>
             <Text style={styles.label}>Correo electrónico</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="tu@email.com"
-              keyboardType="email-address"
-              autoCapitalize="none"
-              placeholderTextColor="#9E9E9E"
-            />
+            <View style={styles.inputWrapper}>
+              <Mail size={20} color={theme.colors.text.light} style={styles.inputIcon} />
+              <TextInput
+                style={styles.input}
+                placeholder="tu@email.com"
+                keyboardType="email-address"
+                autoCapitalize="none"
+                placeholderTextColor={theme.colors.text.light}
+              />
+            </View>
           </View>
 
           <View style={styles.inputContainer}>
             <Text style={styles.label}>Contraseña</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Tu contraseña"
-              secureTextEntry
-              placeholderTextColor="#9E9E9E"
-            />
+            <View style={styles.inputWrapper}>
+              <Lock size={20} color={theme.colors.text.light} style={styles.inputIcon} />
+              <TextInput
+                style={styles.input}
+                placeholder="Tu contraseña"
+                secureTextEntry
+                placeholderTextColor={theme.colors.text.light}
+              />
+            </View>
           </View>
 
-          <TouchableOpacity style={styles.forgotPassword}>
+          <TouchableOpacity 
+            style={styles.forgotPassword}
+            activeOpacity={0.8}
+          >
             <Text style={styles.forgotPasswordText}>¿Olvidaste tu contraseña?</Text>
           </TouchableOpacity>
         </View>
@@ -53,96 +67,109 @@ export default function Auth() {
           <TouchableOpacity 
             style={styles.button}
             onPress={handleLogin}
+            activeOpacity={0.8}
           >
             <Text style={styles.buttonText}>Iniciar Sesión</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={[styles.button, styles.registerButton]}>
+          <TouchableOpacity 
+            style={[styles.button, styles.registerButton]}
+            activeOpacity={0.8}
+          >
             <Text style={[styles.buttonText, styles.registerButtonText]}>Crear Cuenta</Text>
           </TouchableOpacity>
         </View>
       </View>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.background,
   },
   header: {
-    backgroundColor: '#6200EE',
-    padding: 16,
+    backgroundColor: theme.colors.primary,
+    padding: theme.spacing.xl,
     paddingTop: 48,
     flexDirection: 'row',
     alignItems: 'center',
-    elevation: 4,
+    borderBottomLeftRadius: theme.borderRadius.xl,
+    borderBottomRightRadius: theme.borderRadius.xl,
+    ...theme.shadows.lg,
   },
   backButton: {
-    padding: 8,
+    padding: theme.spacing.sm,
   },
   headerTitle: {
-    color: '#fff',
-    fontSize: 20,
-    fontWeight: '500',
-    marginLeft: 16,
+    ...theme.typography.h2,
+    color: theme.colors.surface,
+    marginLeft: theme.spacing.md,
   },
   content: {
     flex: 1,
-    padding: 24,
+    padding: theme.spacing.xl,
   },
   form: {
-    gap: 24,
-    marginBottom: 32,
+    gap: theme.spacing.lg,
+    marginBottom: theme.spacing.xl,
   },
   inputContainer: {
-    gap: 8,
+    gap: theme.spacing.sm,
   },
   label: {
-    fontSize: 14,
+    ...theme.typography.caption,
+    color: theme.colors.text.primary,
     fontWeight: '500',
-    color: '#212121',
+  },
+  inputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.borderRadius.md,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    ...theme.shadows.sm,
+  },
+  inputIcon: {
+    marginLeft: theme.spacing.md,
   },
   input: {
-    backgroundColor: '#F5F5F5',
-    borderRadius: 4,
-    padding: 16,
-    fontSize: 16,
-    color: '#212121',
-    elevation: 2,
+    flex: 1,
+    padding: theme.spacing.lg,
+    ...theme.typography.body,
+    color: theme.colors.text.primary,
   },
   forgotPassword: {
     alignSelf: 'flex-end',
   },
   forgotPasswordText: {
-    color: '#6200EE',
-    fontSize: 14,
+    color: theme.colors.primary,
+    ...theme.typography.caption,
     fontWeight: '500',
   },
   buttonContainer: {
-    gap: 16,
+    gap: theme.spacing.md,
   },
   button: {
-    backgroundColor: '#6200EE',
-    paddingVertical: 16,
-    paddingHorizontal: 24,
-    borderRadius: 4,
+    backgroundColor: theme.colors.primary,
+    paddingVertical: theme.spacing.lg,
+    paddingHorizontal: theme.spacing.xl,
+    borderRadius: theme.borderRadius.lg,
     alignItems: 'center',
-    elevation: 4,
+    ...theme.shadows.md,
   },
   buttonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
+    ...theme.typography.button,
+    color: theme.colors.surface,
   },
   registerButton: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.surface,
     borderWidth: 2,
-    borderColor: '#6200EE',
-    elevation: 0,
+    borderColor: theme.colors.primary,
   },
   registerButtonText: {
-    color: '#6200EE',
+    color: theme.colors.primary,
   },
 });

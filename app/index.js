@@ -1,6 +1,7 @@
 import { View, Text, StyleSheet, TouchableOpacity, Image, Dimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
+import { theme } from './theme';
 
 const { width, height } = Dimensions.get('window');
 
@@ -10,7 +11,7 @@ export default function Home() {
   return (
     <View style={styles.container}>
       <LinearGradient
-        colors={['rgba(255, 255, 255, 0.9)', 'rgba(255,255,255,0.6)']}
+        colors={['rgba(108, 99, 255, 0.1)', 'rgba(255, 101, 132, 0.05)']}
         style={styles.gradient}
       />
       
@@ -20,13 +21,16 @@ export default function Home() {
       />
 
       <View style={styles.content}>
-        <Text style={styles.title}>LimpiVen</Text>
-        <Text style={styles.subtitle}>Aseo al instante, resultados brillantes!</Text>
+        <View>
+          <Text style={styles.title}>LimpiVen</Text>
+          <Text style={styles.subtitle}>Aseo al instante, resultados brillantes!</Text>
+        </View>
 
         <View style={styles.buttonContainer}>
           <TouchableOpacity
             style={styles.button}
             onPress={() => router.push('/auth')}
+            activeOpacity={0.8}
           >
             <Text style={styles.buttonText}>Iniciar Sesión o Registrarse</Text>
           </TouchableOpacity>
@@ -34,6 +38,7 @@ export default function Home() {
           <TouchableOpacity
             style={[styles.button, styles.employeeButton]}
             onPress={() => router.push('/employee-signup')}
+            activeOpacity={0.8}
           >
             <Text style={[styles.buttonText, styles.employeeButtonText]}>
               ¿Deseas ser empleado? ¡Regístrate!
@@ -52,13 +57,13 @@ const styles = StyleSheet.create({
     maxWidth: 500,
     alignSelf: 'center',
     justifyContent: 'center',
-    backgroundColor: '#ffffff',
+    backgroundColor: theme.colors.background,
   },
   backgroundImage: {
     position: 'absolute',
     width: '100%',
     height: '100%',
-    opacity: 0.3,
+    opacity: 0.2,
   },
   gradient: {
     position: 'absolute',
@@ -70,51 +75,42 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    justifyContent: 'flex-end',
-    padding: 24,
+    justifyContent: 'space-between',
+    padding: theme.spacing.xl,
     zIndex: 2,
   },
   title: {
-    fontSize: 42,
-    fontWeight: 'bold',
-    color: '#1a1a1a',
-    marginBottom: 8,
+    ...theme.typography.h1,
+    color: theme.colors.primary,
+    marginBottom: theme.spacing.sm,
   },
   subtitle: {
-    fontSize: 18,
-    color: '#666',
-    marginBottom: 48,
+    ...theme.typography.body,
+    color: theme.colors.text.secondary,
+    marginBottom: theme.spacing.xxl,
   },
   buttonContainer: {
-    gap: 16,
-    marginBottom: 48,
+    gap: theme.spacing.md,
+    marginBottom: theme.spacing.xxl,
   },
   button: {
-    backgroundColor: '#007AFF',
-    paddingVertical: 16,
-    paddingHorizontal: 24,
-    borderRadius: 12,
+    backgroundColor: theme.colors.primary,
+    paddingVertical: theme.spacing.lg,
+    paddingHorizontal: theme.spacing.xl,
+    borderRadius: theme.borderRadius.lg,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    ...theme.shadows.md,
   },
   buttonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
+    ...theme.typography.button,
+    color: theme.colors.surface,
   },
   employeeButton: {
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#007AFF',
+    backgroundColor: theme.colors.surface,
+    borderWidth: 2,
+    borderColor: theme.colors.primary,
   },
   employeeButtonText: {
-    color: '#007AFF',
+    color: theme.colors.primary,
   },
 });
