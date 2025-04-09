@@ -24,4 +24,4 @@ LimpiVEN es una aplicación diseñada para conectar hogares, empresas y oficinas
    - Política de atención al cliente para resolución de problemas.  
 
 **Objetivo:**  
-Cleampy busca posicionarse como líder en el mercado de servicios de limpieza al proporcionar una plataforma intuitiva, eficiente y profesional, que transmita confianza y satisfacción a todos sus usuarios.
+LimpiVEN busca posicionarse como líder en el mercado de servicios de limpieza al proporcionar una plataforma intuitiva, eficiente y profesional, que transmita confianza y satisfacción a todos sus usuarios.
