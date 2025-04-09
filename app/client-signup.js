@@ -1,12 +1,24 @@
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ArrowLeft, User, Mail, Lock, Phone } from 'lucide-react-native';
 import { theme } from './theme';
 import { useState } from 'react';
 import { supabase } from '../lib/supabase';
 import Toast from 'react-native-toast-message';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
-export default function EmployeeSignup() {
+// Función simple de hash para desarrollo
+const simpleHash = (str) => {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash;
+  }
+  return hash.toString(36);
+};
+
+export default function ClientSignup() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
@@ -53,21 +65,26 @@ export default function EmployeeSignup() {
         return;
       }
 
-      // Registrar usuario
-      const { data, error } = await supabase.auth.signUp({
-        email: formData.email,
-        password: formData.password,
-        options: {
-          data: {
-            full_name: formData.fullName,
-            role: 'cleaner',
-            phone: formData.phone
-          }
-        }
-      });
+      // Hashear la contraseña (solo para desarrollo)
+      const passwordHash = simpleHash(formData.password);
 
-      if (error) {
-        if (error.message.includes('User already registered')) {
+      // Registrar usuario
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .insert([
+          {
+            email: formData.email,
+            password_hash: passwordHash,
+            full_name: formData.fullName,
+            phone_number: formData.phone,
+            role: 'cliente'
+          }
+        ])
+        .select()
+        .single();
+
+      if (userError) {
+        if (userError.message.includes('duplicate key value')) {
           Toast.show({
             type: 'error',
             text1: 'Error',
@@ -77,24 +94,31 @@ export default function EmployeeSignup() {
           Toast.show({
             type: 'error',
             text1: 'Error',
-            text2: error.message
+            text2: userError.message
           });
         }
         return;
       }
 
-      // Crear perfil de limpiador
+      // Crear perfil de cliente
       const { error: profileError } = await supabase
-        .from('cleaner_profiles')
+        .from('client_profiles')
         .insert([
           {
-            user_id: data.user.id,
-            phone: formData.phone,
-            is_available: true
+            user_id: userData.id,
+            address: '',
+            preferences: {},
+            subscription_type: 'basico'
           }
         ]);
 
       if (profileError) {
+        // Si hay error al crear el perfil, eliminamos el usuario creado
+        await supabase
+          .from('users')
+          .delete()
+          .eq('id', userData.id);
+        
         Toast.show({
           type: 'error',
           text1: 'Error',
@@ -102,6 +126,13 @@ export default function EmployeeSignup() {
         });
         return;
       }
+
+      // Guardar información de sesión
+      await AsyncStorage.setItem('id', userData.id);
+      await AsyncStorage.setItem('email', userData.email);
+      await AsyncStorage.setItem('role', userData.role);
+      await AsyncStorage.setItem('full_name', userData.full_name);
+      await AsyncStorage.setItem('phone_number', userData.phone_number);
 
       Toast.show({
         type: 'success',
@@ -121,10 +152,7 @@ export default function EmployeeSignup() {
   };
 
   return (
-    <KeyboardAvoidingView 
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={styles.container}
-    >
+    <View style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity 
           style={styles.backButton}
@@ -133,10 +161,14 @@ export default function EmployeeSignup() {
         >
           <ArrowLeft size={24} color={theme.colors.surface} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Registro de Empleado</Text>
+        <Text style={styles.headerTitle}>Registro de Cliente</Text>
       </View>
 
-      <View style={styles.content}>
+      <ScrollView 
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
+      >
         <View style={styles.form}>
           <View style={styles.inputContainer}>
             <Text style={styles.label}>Nombre completo</Text>
@@ -225,9 +257,9 @@ export default function EmployeeSignup() {
             {loading ? 'Registrando...' : 'Registrarse'}
           </Text>
         </TouchableOpacity>
-      </View>
+      </ScrollView>
       <Toast />
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 
@@ -239,7 +271,7 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: theme.colors.primary,
     padding: theme.spacing.xl,
-    paddingTop: 48,
+    paddingTop: Platform.OS === 'ios' ? 48 : 24,
     flexDirection: 'row',
     alignItems: 'center',
     borderBottomLeftRadius: theme.borderRadius.xl,
@@ -254,13 +286,15 @@ const styles = StyleSheet.create({
     color: theme.colors.surface,
     marginLeft: theme.spacing.md,
   },
-  content: {
+  scrollView: {
     flex: 1,
+  },
+  scrollContent: {
     padding: theme.spacing.xl,
+    paddingBottom: theme.spacing.xxl,
   },
   form: {
     gap: theme.spacing.lg,
-    marginBottom: theme.spacing.xl,
   },
   inputContainer: {
     gap: theme.spacing.sm,
@@ -294,6 +328,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.spacing.xl,
     borderRadius: theme.borderRadius.lg,
     alignItems: 'center',
+    marginTop: theme.spacing.xl,
     ...theme.shadows.md,
   },
   buttonDisabled: {
@@ -303,4 +338,4 @@ const styles = StyleSheet.create({
     ...theme.typography.button,
     color: theme.colors.surface,
   },
-});
+}); 

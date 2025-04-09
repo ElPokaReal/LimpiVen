@@ -1,9 +1,22 @@
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ArrowLeft, Mail, Lock } from 'lucide-react-native';
 import { theme } from './theme';
 import { useState } from 'react';
 import { supabase } from '../lib/supabase';
+import Toast from 'react-native-toast-message';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+// Función simple de hash para desarrollo
+const simpleHash = (str) => {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash;
+  }
+  return hash.toString(36);
+};
 
 export default function Auth() {
   const router = useRouter();
@@ -16,29 +29,69 @@ export default function Auth() {
       setLoading(true);
       
       if (!email || !password) {
-        Alert.alert('Error', 'Por favor ingresa tu email y contraseña');
+        Toast.show({
+          type: 'error',
+          text1: 'Error',
+          text2: 'Por favor ingresa tu email y contraseña'
+        });
         return;
       }
 
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+      // Hashear la contraseña para comparar
+      const passwordHash = simpleHash(password);
 
-      if (error) throw error;
+      // Buscar usuario en la tabla users
+      const { data: user, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('email', email)
+        .eq('password_hash', passwordHash)
+        .single();
 
-      if (data?.user) {
-        router.replace('/(tabs)');
+      if (error) {
+        Toast.show({
+          type: 'error',
+          text1: 'Error',
+          text2: 'Error al buscar usuario'
+        });
+        return;
       }
+
+      if (!user) {
+        Toast.show({
+          type: 'error',
+          text1: 'Error',
+          text2: 'Credenciales incorrectas'
+        });
+        return;
+      }
+
+      // Guardar información de sesión
+      await AsyncStorage.setItem('id', user.id);
+      await AsyncStorage.setItem('email', user.email);
+      await AsyncStorage.setItem('role', user.role);
+      await AsyncStorage.setItem('full_name', user.full_name);
+      await AsyncStorage.setItem('phone_number', user.phone_number);
+
+      Toast.show({
+        type: 'success',
+        text1: 'Éxito',
+        text2: 'Sesión iniciada correctamente'
+      });
+      router.replace('/(tabs)');
     } catch (error) {
-      Alert.alert('Error', error.message);
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: error.message
+      });
     } finally {
       setLoading(false);
     }
   };
 
   const handleSignUp = () => {
-    router.push('/employee-signup');
+    router.push('/client-signup');
   };
 
   return (
@@ -119,6 +172,7 @@ export default function Auth() {
           </TouchableOpacity>
         </View>
       </View>
+      <Toast />
     </KeyboardAvoidingView>
   );
 }

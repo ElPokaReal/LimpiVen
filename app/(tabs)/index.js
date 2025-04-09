@@ -1,11 +1,83 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, RefreshControl } from 'react-native';
 import { Clock, Star, Sparkles } from 'lucide-react-native';
+import { useEffect, useState } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { supabase } from '../../lib/supabase';
+import { theme } from '../theme';
 
 export default function HomeScreen() {
+  const [userName, setUserName] = useState('');
+  const [refreshing, setRefreshing] = useState(false);
+
+  const loadUserData = async () => {
+    const name = await AsyncStorage.getItem('full_name');
+    if (name) setUserName(name);
+  };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    try {
+      const userId = await AsyncStorage.getItem('id');
+      if (userId) {
+        const { data: user, error } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', userId)
+          .single();
+
+        if (user) {
+          setUserName(user.full_name);
+          await AsyncStorage.setItem('full_name', user.full_name);
+        }
+      }
+    } catch (error) {
+      console.error('Error al refrescar:', error);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    loadUserData();
+
+    // Suscribirse a cambios en la tabla users
+    const subscription = supabase
+      .channel('user_changes')
+      .on('postgres_changes', 
+        { 
+          event: 'UPDATE', 
+          schema: 'public', 
+          table: 'users' 
+        }, 
+        async (payload) => {
+          const userId = await AsyncStorage.getItem('id');
+          if (payload.new.id === userId) {
+            setUserName(payload.new.full_name);
+            await AsyncStorage.setItem('full_name', payload.new.full_name);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
+
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView 
+      style={styles.container}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          colors={[theme.colors.primary]}
+          tintColor={theme.colors.primary}
+        />
+      }
+    >
       <View style={styles.header}>
-        <Text style={styles.greeting}>¡Hola, Samuel!</Text>
+        <Text style={styles.greeting}>¡Hola, {userName}!</Text>
         <Text style={styles.subtitle}>¿Qué servicio necesitas hoy?</Text>
       </View>
 
