@@ -1,13 +1,44 @@
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ArrowLeft, Mail, Lock } from 'lucide-react-native';
 import { theme } from './theme';
+import { useState } from 'react';
+import { supabase } from '../lib/supabase';
 
 export default function Auth() {
   const router = useRouter();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleLogin = () => {
-    router.replace('/(tabs)');
+  const handleLogin = async () => {
+    try {
+      setLoading(true);
+      
+      if (!email || !password) {
+        Alert.alert('Error', 'Por favor ingresa tu email y contraseña');
+        return;
+      }
+
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) throw error;
+
+      if (data?.user) {
+        router.replace('/(tabs)');
+      }
+    } catch (error) {
+      Alert.alert('Error', error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSignUp = () => {
+    router.push('/employee-signup');
   };
 
   return (
@@ -37,6 +68,8 @@ export default function Auth() {
                 placeholder="tu@email.com"
                 keyboardType="email-address"
                 autoCapitalize="none"
+                value={email}
+                onChangeText={setEmail}
                 placeholderTextColor={theme.colors.text.light}
               />
             </View>
@@ -50,6 +83,8 @@ export default function Auth() {
                 style={styles.input}
                 placeholder="Tu contraseña"
                 secureTextEntry
+                value={password}
+                onChangeText={setPassword}
                 placeholderTextColor={theme.colors.text.light}
               />
             </View>
@@ -65,15 +100,19 @@ export default function Auth() {
 
         <View style={styles.buttonContainer}>
           <TouchableOpacity 
-            style={styles.button}
+            style={[styles.button, loading && styles.buttonDisabled]}
             onPress={handleLogin}
             activeOpacity={0.8}
+            disabled={loading}
           >
-            <Text style={styles.buttonText}>Iniciar Sesión</Text>
+            <Text style={styles.buttonText}>
+              {loading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
+            </Text>
           </TouchableOpacity>
 
           <TouchableOpacity 
             style={[styles.button, styles.registerButton]}
+            onPress={handleSignUp}
             activeOpacity={0.8}
           >
             <Text style={[styles.buttonText, styles.registerButtonText]}>Crear Cuenta</Text>
@@ -159,6 +198,9 @@ const styles = StyleSheet.create({
     borderRadius: theme.borderRadius.lg,
     alignItems: 'center',
     ...theme.shadows.md,
+  },
+  buttonDisabled: {
+    opacity: 0.7,
   },
   buttonText: {
     ...theme.typography.button,

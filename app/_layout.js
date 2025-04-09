@@ -10,7 +10,7 @@ export default function RootLayout() {
         },
         headerTintColor: theme.colors.surface,
         headerTitleStyle: {
-          ...theme.typography.h3,
+          ...theme.typography.h4,
           color: theme.colors.surface,
         },
         headerShadowVisible: false,
