@@ -78,7 +78,18 @@ export default function Auth() {
         text1: 'Éxito',
         text2: 'Sesión iniciada correctamente'
       });
-      router.replace('/(tabs)');
+      
+      // Redirección basada en rol
+      if (user.role === 'limpiador') {
+        router.replace('/(employee)/'); // Redirigir al grupo de empleado
+      } else if (user.role === 'cliente') {
+        router.replace('/(tabs)/'); // Redirigir al grupo de cliente
+      } else {
+        // Manejar otros roles (ej. admin) o rol inesperado
+        console.warn('Rol de usuario desconocido:', user.role);
+        router.replace('/(tabs)/'); // Redirigir a cliente por defecto o a una pantalla de error
+      }
+      
     } catch (error) {
       Toast.show({
         type: 'error',
