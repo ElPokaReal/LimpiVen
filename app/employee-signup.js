@@ -8,8 +8,8 @@ import Toast from 'react-native-toast-message';
 // Quitar AsyncStorage si no se usa más para sesión de Supabase Auth
 // import AsyncStorage from '@react-native-async-storage/async-storage'; 
 
-// Función simple de hash (traída de client-signup o un módulo común)
-// CONSIDERACIÓN: Usar una librería de hashing más robusta en producción (e.g., bcrypt)
+// Eliminar la función simpleHash ya que usaremos supabase.auth.signUp
+/* 
 const simpleHash = (str) => {
   let hash = 0;
   for (let i = 0; i < str.length; i++) {
@@ -19,6 +19,7 @@ const simpleHash = (str) => {
   }
   return hash.toString(36);
 };
+*/
 
 export default function EmployeeSignup() {
   const router = useRouter();
@@ -70,68 +71,102 @@ export default function EmployeeSignup() {
         return;
       }
 
-      // Hashear la contraseña
-      const passwordHash = simpleHash(formData.password);
+      // Ya no necesitamos hashear manualmente la contraseña
+      // const passwordHash = simpleHash(formData.password);
 
-      // 1. Insertar en la tabla users
-      const { data: userData, error: userError } = await supabase
-        .from('users')
-        .insert([
-          { 
-            email: formData.email, 
-            password_hash: passwordHash, 
+      // 1. Registrar al usuario en Supabase Auth
+      const { data: authData, error: signUpError } = await supabase.auth.signUp({
+        email: formData.email,
+        password: formData.password,
+        options: {
+          // Podemos intentar pasar datos adicionales aquí, aunque los insertaremos después
+          data: { 
             full_name: formData.fullName,
-            phone_number: formData.phone,
-            role: 'limpiador' // Establecer rol directamente
+            // No establecemos el 'role' aquí directamente en la tabla auth.users
+            // Lo haremos en nuestra tabla 'users'
           }
-        ])
-        .select() // Pedir que devuelva los datos insertados
-        .single(); // Esperar un solo registro
-
-      if (userError) {
-        // Manejar error de usuario duplicado u otros errores
-        if (userError.message.includes('duplicate key value') && userError.message.includes('users_email_key')) {
-           Toast.show({
-            type: 'error',
-            text1: 'Error',
-            text2: 'El correo electrónico ya está registrado'
-          });
-        } else {
-          Toast.show({
-            type: 'error',
-            text1: 'Error al registrar usuario',
-            text2: userError.message
-          });
         }
-        return; // Salir si hay error al crear usuario
+      });
+
+      if (signUpError) {
+        // Manejar errores específicos de signUp, como correo ya registrado
+         if (signUpError.message.includes('User already registered')) {
+             Toast.show({
+                type: 'error',
+                text1: 'Error',
+                text2: 'El correo electrónico ya está registrado'
+            });
+         } else {
+            Toast.show({
+                type: 'error',
+                text1: 'Error al registrar usuario',
+                text2: signUpError.message
+            });
+         }
+        setLoading(false); // Asegurarse de parar el loading
+        return; // Salir si hay error en signUp
       }
       
-      // Verificar si userData existe y tiene id
-       if (!userData || !userData.id) {
+      // Verificar si authData o authData.user es null (importante)
+       if (!authData || !authData.user) {
           Toast.show({
             type: 'error',
             text1: 'Error',
-            text2: 'No se pudo obtener el ID del usuario creado.'
+            text2: 'No se pudo obtener la información del usuario tras el registro.'
           });
-          // Considerar si deberíamos intentar eliminar el usuario insertado aquí
+          setLoading(false);
+          // Podríamos considerar aquí llamar a una función para eliminar el usuario de auth si se creó
           return;
        }
 
+
+      // 2. Insertar perfil en la tabla 'users' usando el ID de Supabase Auth
+      const { error: profileError } = await supabase
+        .from('users')
+        .insert([
+          { 
+            id: authData.user.id, // Usar el ID del usuario autenticado
+            email: formData.email, 
+            full_name: formData.fullName,
+            phone_number: formData.phone,
+            role: 'limpiador' // Establecer rol aquí
+          }
+        ]);
+
+      if (profileError) {
+         // Si falla la creación del perfil, informar al usuario.
+         // Idealmente, se podría intentar borrar el usuario de auth.users para consistencia,
+         // pero por ahora solo mostraremos el error.
+        Toast.show({
+            type: 'error',
+            text1: 'Error al crear perfil',
+            // Podríamos querer mostrar un mensaje más genérico al usuario final
+            text2: profileError.message 
+          });
+        // No necesariamente retornamos aquí, el usuario está registrado pero sin perfil completo.
+        // Depende de la lógica de negocio qué hacer. Por ahora, dejaremos que continúe
+        // pero el login podría fallar si depende de la tabla 'users'.
+         console.error("Error creating user profile:", profileError);
+         // Considerar return aquí si el perfil es absolutamente necesario para continuar
+         // return; 
+      }
 
       // Éxito
       Toast.show({
         type: 'success',
         text1: 'Éxito',
-        text2: 'Cuenta de empleado creada correctamente'
+        text2: 'Cuenta de empleado creada correctamente. Revisa tu email para confirmar.' // Ajustar si la confirmación está habilitada
       });
       
-      // Opcional: Guardar datos en AsyncStorage si son necesarios globalmente
-      // await AsyncStorage.setItem('userRole', 'limpiador');
-      // await AsyncStorage.setItem('userId', userData.id);
-      // await AsyncStorage.setItem('userFullName', userData.full_name);
+      // Limpiar AsyncStorage si ya no es necesario
+      // await AsyncStorage.removeItem('userRole');
+      // await AsyncStorage.removeItem('userId');
+      // await AsyncStorage.removeItem('userFullName');
 
 
-      router.replace('/(tabs)/employee-dashboard'); // Redirigir al dashboard de empleado
+      // No es necesario iniciar sesión aquí, el usuario ya está "logueado" tras signUp
+      // Pero sí redirigimos
+      router.replace('/(employee)/'); // Ajustar la ruta si es necesario
 
     } catch (error) {
       Toast.show({

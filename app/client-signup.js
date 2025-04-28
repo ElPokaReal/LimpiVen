@@ -5,18 +5,6 @@ import { theme } from './theme';
 import { useState } from 'react';
 import { supabase } from '../lib/supabase';
 import Toast from 'react-native-toast-message';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-
-// Función simple de hash para desarrollo
-const simpleHash = (str) => {
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    const char = str.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
-    hash = hash & hash;
-  }
-  return hash.toString(36);
-};
 
 export default function ClientSignup() {
   const router = useRouter();
@@ -34,6 +22,7 @@ export default function ClientSignup() {
   };
 
   const handleSubmit = async () => {
+    let createdUserId = null; // Para guardar el ID del usuario creado en auth
     try {
       setLoading(true);
 
@@ -44,6 +33,7 @@ export default function ClientSignup() {
           text1: 'Error',
           text2: 'Todos los campos son requeridos'
         });
+        setLoading(false);
         return;
       }
 
@@ -53,6 +43,7 @@ export default function ClientSignup() {
           text1: 'Error',
           text2: 'Las contraseñas no coinciden'
         });
+        setLoading(false);
         return;
       }
 
@@ -62,90 +53,135 @@ export default function ClientSignup() {
           text1: 'Error',
           text2: 'La contraseña debe tener al menos 6 caracteres'
         });
+        setLoading(false);
         return;
       }
 
-      // Hashear la contraseña (solo para desarrollo)
-      const passwordHash = simpleHash(formData.password);
+      // 1. Registrar usuario en Supabase Auth
+      const { data: authData, error: signUpError } = await supabase.auth.signUp({
+        email: formData.email,
+        password: formData.password,
+        options: {
+          data: {
+            full_name: formData.fullName,
+            // El rol se manejará en nuestra tabla 'users'
+          }
+        }
+      });
 
-      // Registrar usuario
-      const { data: userData, error: userError } = await supabase
+      if (signUpError) {
+        if (signUpError.message.includes('User already registered')) {
+           Toast.show({
+              type: 'error',
+              text1: 'Error',
+              text2: 'El correo electrónico ya está registrado'
+          });
+         } else {
+           Toast.show({
+              type: 'error',
+              text1: 'Error al registrar usuario',
+              text2: signUpError.message
+          });
+         }
+        setLoading(false);
+        return;
+      }
+
+      if (!authData || !authData.user) {
+          Toast.show({
+            type: 'error',
+            text1: 'Error',
+            text2: 'No se pudo obtener la información del usuario tras el registro.'
+          });
+          setLoading(false);
+          return;
+       }
+
+      createdUserId = authData.user.id; // Guardamos el ID por si necesitamos borrarlo
+
+      // 2. Insertar en la tabla 'users'
+      const { error: userInsertError } = await supabase
         .from('users')
         .insert([
           {
+            id: authData.user.id, // Usar el ID de Supabase Auth
             email: formData.email,
-            password_hash: passwordHash,
+            // password_hash ya no es necesario aquí
             full_name: formData.fullName,
             phone_number: formData.phone,
-            role: 'cliente'
+            role: 'cliente' // Definir rol aquí
           }
-        ])
-        .select()
-        .single();
+        ]);
+        // No necesitamos .select().single() aquí a menos que necesitemos los datos de vuelta
 
-      if (userError) {
-        if (userError.message.includes('duplicate key value')) {
+      if (userInsertError) {
+          console.error("Error inserting into users table:", userInsertError);
           Toast.show({
             type: 'error',
             text1: 'Error',
-            text2: 'El correo electrónico ya está registrado'
+            text2: 'Error al guardar datos de usuario.' // Mensaje genérico para el usuario
           });
-        } else {
-          Toast.show({
-            type: 'error',
-            text1: 'Error',
-            text2: userError.message
-          });
-        }
-        return;
+          // IMPORTANTE: Si falla la inserción en 'users', DEBERÍAMOS borrar el usuario de Supabase Auth
+          // para evitar inconsistencias. Esto requiere una función separada o manejo aquí.
+          // Por ahora, solo mostramos error y paramos. Considerar implementar limpieza.
+          setLoading(false);
+          return;
       }
 
-      // Crear perfil de cliente
+      // 3. Crear perfil de cliente en 'client_profiles'
       const { error: profileError } = await supabase
         .from('client_profiles')
         .insert([
           {
-            user_id: userData.id,
-            address: '',
-            preferences: {},
-            subscription_type: 'basico'
+            user_id: authData.user.id, // Usar el mismo ID
+            // Valores iniciales/por defecto para el perfil de cliente
+            address: '', 
+            preferences: {}, 
+            subscription_type: 'Paquete Bajo' // O el valor por defecto que corresponda
           }
         ]);
 
       if (profileError) {
-        // Si hay error al crear el perfil, eliminamos el usuario creado
+         console.error("Error inserting into client_profiles:", profileError);
+        // Si hay error al crear el perfil, podríamos eliminar el usuario de 'users' Y de 'auth.users'
+        // Esto se vuelve complejo. Por ahora, solo mostramos error.
+        // Idealmente, esto debería ser una transacción o tener una lógica de compensación robusta.
+        /*
         await supabase
           .from('users')
           .delete()
-          .eq('id', userData.id);
-        
+          .eq('id', authData.user.id);
+        // También necesitarías borrar de auth.users llamando a una función de admin o similar
+        */
         Toast.show({
           type: 'error',
           text1: 'Error',
-          text2: 'Error al crear el perfil'
+          text2: 'Error al crear el perfil de cliente.' // Mensaje genérico
         });
+        setLoading(false);
         return;
       }
-
-      // Guardar información de sesión
-      await AsyncStorage.setItem('id', userData.id);
-      await AsyncStorage.setItem('email', userData.email);
-      await AsyncStorage.setItem('role', userData.role);
-      await AsyncStorage.setItem('full_name', userData.full_name);
-      await AsyncStorage.setItem('phone_number', userData.phone_number);
 
       Toast.show({
         type: 'success',
         text1: 'Éxito',
-        text2: 'Cuenta creada correctamente'
+        text2: 'Cuenta creada correctamente. Revisa tu email para confirmar.' // Ajustar si aplica
       });
-      router.replace('/(tabs)');
+      router.replace('/(tabs)'); // Redirigir a la pestaña de cliente
+
     } catch (error) {
+       // Captura de errores inesperados generales
+      console.error("Unexpected signup error:", error);
       Toast.show({
         type: 'error',
-        text1: 'Error',
-        text2: error.message
+        text1: 'Error inesperado',
+        text2: error instanceof Error ? error.message : 'Ocurrió un error desconocido'
       });
+      // Si tuvimos un error después de crear el usuario en Auth, podríamos intentar borrarlo
+      if (createdUserId) {
+           console.warn("Attempting to clean up auth user due to error:", createdUserId);
+           // Aquí iría la lógica para borrar el usuario de auth.users si es necesario/posible
+      }
     } finally {
       setLoading(false);
     }

@@ -5,18 +5,6 @@ import { theme } from './theme';
 import { useState } from 'react';
 import { supabase } from '../lib/supabase';
 import Toast from 'react-native-toast-message';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-
-// Función simple de hash para desarrollo
-const simpleHash = (str) => {
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    const char = str.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
-    hash = hash & hash;
-  }
-  return hash.toString(36);
-};
 
 export default function Auth() {
   const router = useRouter();
@@ -25,9 +13,8 @@ export default function Auth() {
   const [loading, setLoading] = useState(false);
 
   const handleLogin = async () => {
+    setLoading(true);
     try {
-      setLoading(true);
-      
       if (!email || !password) {
         Toast.show({
           type: 'error',
@@ -37,64 +24,74 @@ export default function Auth() {
         return;
       }
 
-      // Hashear la contraseña para comparar
-      const passwordHash = simpleHash(password);
+      // 1. Iniciar sesión con Supabase Auth
+      const { data: authData, error: signInError } = await supabase.auth.signInWithPassword({
+        email: email,
+        password: password,
+      });
 
-      // Buscar usuario en la tabla users
-      const { data: user, error } = await supabase
-        .from('users')
-        .select('*')
-        .eq('email', email)
-        .eq('password_hash', passwordHash)
-        .single();
-
-      if (error) {
-        Toast.show({
-          type: 'error',
-          text1: 'Error',
-          text2: 'Error al buscar usuario'
-        });
+      if (signInError) {
+        // Manejar errores específicos de Supabase si es necesario
+        if (signInError.message.includes('Invalid login credentials')) {
+          Toast.show({ type: 'error', text1: 'Error', text2: 'Credenciales incorrectas' });
+        } else {
+          Toast.show({ type: 'error', text1: 'Error de inicio de sesión', text2: signInError.message });
+        }
         return;
       }
-
-      if (!user) {
-        Toast.show({
-          type: 'error',
-          text1: 'Error',
-          text2: 'Credenciales incorrectas'
-        });
-        return;
+      
+      // Verificar que tenemos un usuario autenticado
+      if (!authData || !authData.user) {
+           Toast.show({ type: 'error', text1: 'Error', text2: 'No se pudo obtener la información del usuario.' });
+           return;
       }
 
-      // Guardar información de sesión
-      await AsyncStorage.setItem('id', user.id);
-      await AsyncStorage.setItem('email', user.email);
-      await AsyncStorage.setItem('role', user.role);
-      await AsyncStorage.setItem('full_name', user.full_name);
-      await AsyncStorage.setItem('phone_number', user.phone_number);
+      // 2. Obtener el rol del usuario desde la tabla 'users' (necesario para redirección)
+      // Asegúrate de que las políticas RLS permitan al usuario leer su propia fila en 'users'
+      // La política "Users can view their own data" ON users FOR SELECT USING (auth.uid() = id); debería funcionar.
+      const { data: userData, error: userError } = await supabase
+          .from('users')
+          .select('role')
+          .eq('id', authData.user.id)
+          .single();
 
+      if (userError) {
+          console.error("Error fetching user role:", userError);
+          Toast.show({ type: 'error', text1: 'Error', text2: 'No se pudo verificar el rol del usuario.' });
+          // Considerar desloguear si no podemos obtener el rol? supabase.auth.signOut();
+          return;
+      }
+      
+      if (!userData) {
+          Toast.show({ type: 'error', text1: 'Error', text2: 'Perfil de usuario no encontrado en la base de datos.' });
+          // Considerar desloguear
+           return;
+      }
+
+      // 3. Redirección basada en rol
       Toast.show({
         type: 'success',
         text1: 'Éxito',
         text2: 'Sesión iniciada correctamente'
       });
-      
-      // Redirección basada en rol
-      if (user.role === 'limpiador') {
-        router.replace('/(employee)/'); // Redirigir al grupo de empleado
-      } else if (user.role === 'cliente') {
-        router.replace('/(tabs)/'); // Redirigir al grupo de cliente
+
+      const userRole = userData.role;
+      if (userRole === 'limpiador') {
+        router.replace('/(employee)/'); 
+      } else if (userRole === 'cliente') {
+        router.replace('/(tabs)/'); 
       } else {
-        // Manejar otros roles (ej. admin) o rol inesperado
-        console.warn('Rol de usuario desconocido:', user.role);
-        router.replace('/(tabs)/'); // Redirigir a cliente por defecto o a una pantalla de error
+        console.warn('Rol de usuario desconocido o no manejado:', userRole);
+        router.replace('/(tabs)/'); // Redirigir a cliente por defecto
       }
       
     } catch (error) {
+      // Captura errores inesperados
+      console.error("Unexpected login error:", error);
       Toast.show({
         type: 'error',
-        text1: 'Error',
-        text2: error.message
+        text1: 'Error inesperado',
+        text2: error instanceof Error ? error.message : 'Ocurrió un error desconocido'
       });
     } finally {
       setLoading(false);

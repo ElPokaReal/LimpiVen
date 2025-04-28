@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Platform } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Platform, RefreshControl } from 'react-native';
 import { Clock, MapPin, Plus } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { theme } from '../theme';
@@ -10,48 +10,81 @@ export default function BookingsScreen() {
   const router = useRouter();
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [userId, setUserId] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
 
-  useEffect(() => {
-    const initialize = async () => {
-      setLoading(true);
-      try {
-        const { data: { user }, error: userError } = await supabase.auth.getUser();
-        if (userError || !user) {
-          Toast.show({ type: 'error', text1: 'Error', text2: 'No autenticado' });
-          router.replace('/login');
-          return;
-        }
-        setUserId(user.id);
+  // Función reutilizable para cargar las reservas
+  const fetchBookings = useCallback(async () => {
+    setLoading(true); // Mostrar loader al cargar/refrescar inicialmente
+    try {
+      // 1. Obtener usuario de Supabase Auth
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
 
-        const { data: bookingsData, error: bookingsError } = await supabase
-          .from('bookings')
-          .select(`
-            id,
-            scheduled_date,
-            address,
-            status,
-            services ( name )
-          `)
-          .eq('client_id', user.id)
-          .order('scheduled_date', { ascending: false });
-
-        if (bookingsError) throw bookingsError;
-
-        setBookings(bookingsData || []);
-      } catch (error) {
-        Toast.show({
-          type: 'error',
-          text1: 'Error cargando reservas',
-          text2: error instanceof Error ? error.message : 'Ocurrió un error'
-        });
-        setBookings([]);
-      } finally {
-        setLoading(false);
+      if (userError || !user) {
+        Toast.show({ type: 'error', text1: 'Error', text2: 'No autenticado. Inicia sesión.' });
+        router.replace('/auth'); // Asegúrate que la ruta de login sea correcta
+        return;
       }
-    };
-    initialize();
-  }, []);
+
+      // Log para verificar el ID obtenido
+      console.log('Usuario autenticado en BookingsScreen:', user.id);
+
+      // 2. Obtener reservas del usuario usando user.id
+      const { data: bookingsData, error: bookingsError } = await supabase
+        .from('bookings')
+        .select(`
+          id,
+          scheduled_date,
+          address,
+          status,
+          services ( name )
+        `)
+        .eq('client_id', user.id) // <- Usar user.id directamente
+        .order('scheduled_date', { ascending: false });
+
+      if (bookingsError) {
+          // Log específico del error de Supabase
+          console.error("Supabase bookings fetch error:", bookingsError);
+          // Revisar si es un error RLS (puede que no siempre sea explícito)
+          if (bookingsError.message.includes("security policy")) {
+              Toast.show({
+                  type: 'error',
+                  text1: 'Acceso Denegado',
+                  text2: 'Verifica las políticas de seguridad para reservas.'
+              });
+          } else {
+              throw bookingsError; // Lanzar otros errores para el catch general
+          }
+          setBookings([]); // Dejar lista vacía si hay error
+      } else {
+         // Log para ver qué datos se reciben
+         console.log('Bookings data received:', bookingsData);
+         setBookings(bookingsData || []);
+      }
+
+    } catch (error) {
+      console.error("Error fetching bookings:", error);
+      Toast.show({
+        type: 'error',
+        text1: 'Error cargando reservas',
+        text2: error instanceof Error ? error.message : 'Ocurrió un error'
+      });
+      setBookings([]);
+    } finally {
+      setLoading(false);
+      setRefreshing(false); // Asegurarse que refreshing termine aquí también
+    }
+  }, [router]); // Incluir router como dependencia si se usa para redirección
+
+  // Carga inicial
+  useEffect(() => {
+    fetchBookings();
+  }, [fetchBookings]); // fetchBookings es ahora la dependencia
+
+  // Función para el RefreshControl
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    fetchBookings(); // Llama a la misma función de carga
+  }, [fetchBookings]); // Dependencia de fetchBookings
 
   const handleRequestService = () => {
     router.push('/request-service');
@@ -94,7 +127,17 @@ export default function BookingsScreen() {
             </TouchableOpacity>
         </View>
 
-        <ScrollView style={styles.container}>
+        <ScrollView
+         style={styles.container}
+          refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          colors={[theme.colors.primary]}
+          tintColor={theme.colors.primary}
+        />
+        }
+        >
             {loading ? (
                 <ActivityIndicator size="large" color={theme.colors.primary} style={styles.loader} />
             ) : bookings.length === 0 ? (

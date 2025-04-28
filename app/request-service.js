@@ -15,8 +15,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { supabase } from '../lib/supabase'; // Asegúrate que la ruta sea correcta
 import { theme } from './theme'; // Asegúrate que la ruta sea correcta
 import Toast from 'react-native-toast-message';
-// Considerar un componente Picker personalizado o una librería si se necesita más estilo
-// import { Picker } from '@react-native-picker/picker'; 
+import { Picker } from '@react-native-picker/picker'; 
 
 export default function RequestServiceScreen() {
   const router = useRouter();
@@ -28,32 +27,36 @@ export default function RequestServiceScreen() {
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [address, setAddress] = useState('');
   const [instructions, setInstructions] = useState('');
-  const [userId, setUserId] = useState(null); // Para almacenar el ID del usuario
+  const [userId, setUserId] = useState(null); // <- Volvemos a usar userId para guardar el ID del estado
+  const [frequency, setFrequency] = useState('una_vez'); // Nuevo estado para frecuencia, valor inicial 'una_vez'
 
   // Obtener servicios disponibles y ID de usuario al cargar
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
       try {
-        // Obtener usuario actual
+        // 1. Obtener usuario de Supabase Auth
         const { data: { user }, error: userError } = await supabase.auth.getUser();
+        
         if (userError || !user) {
-          Toast.show({ type: 'error', text1: 'Error', text2: 'No se pudo obtener el usuario.' });
-          router.replace('/login'); // Redirigir si no hay usuario
+          Toast.show({ type: 'error', text1: 'Error', text2: 'No autenticado. Inicia sesión.' });
+          router.replace('/login'); 
           return;
         }
-        setUserId(user.id);
+        setUserId(user.id); // Guardar el ID en el estado
+        console.log('Usuario autenticado en RequestService:', user.id); // Log
 
-        // Obtener servicios activos
+        // 2. Obtener servicios activos (sin cambios)
         const { data: servicesData, error: servicesError } = await supabase
           .from('services')
-          .select('id, name, base_price, duration_minutes')
+          .select('id, name, base_price, duration_minutes, recommended_frequency, space_limitations') // Añadir nuevas columnas si las necesitas mostrar
           .eq('is_active', true);
 
         if (servicesError) throw servicesError;
         setServices(servicesData || []);
 
       } catch (error) {
+        console.error("Error fetching data in RequestService:", error);
         Toast.show({
           type: 'error',
           text1: 'Error cargando datos',
@@ -89,17 +92,18 @@ export default function RequestServiceScreen() {
   
   // --- Manejador de envío ---
   const handleSubmit = async () => {
-    if (!selectedServiceId || !address || !userId) {
-      Toast.show({ type: 'error', text1: 'Campos requeridos', text2: 'Selecciona un servicio y proporciona una dirección.' });
+    // Usar userId del estado y añadir validación de frequency si es necesario
+    if (!selectedServiceId || !address || !userId || !frequency) { 
+      Toast.show({ type: 'error', text1: 'Campos requeridos', text2: 'Selecciona servicio, frecuencia y proporciona dirección.' });
       return;
     }
-    // Validación de fecha/hora (ej: no en el pasado)
     if (date <= new Date()) {
        Toast.show({ type: 'error', text1: 'Fecha inválida', text2: 'Selecciona una fecha y hora futuras.' });
       return;
     }
 
     setLoading(true);
+    console.log('Enviando booking con client_id:', userId, 'frequency:', frequency); // Log antes de insertar
     try {
       const { error } = await supabase
         .from('bookings')
@@ -107,21 +111,28 @@ export default function RequestServiceScreen() {
           { 
             client_id: userId, 
             service_id: selectedServiceId, 
-            scheduled_date: date.toISOString(), // Guardar en formato ISO
+            scheduled_date: date.toISOString(), 
             address: address, 
             special_instructions: instructions,
-            status: 'pendiente', // Estado inicial
-            // frequency: 'una_vez' // Asumir 'una_vez' por ahora
+            status: 'pendiente',
+            frequency: frequency, // <-- Añadir frecuencia aquí
           }
         ]);
 
-      if (error) throw error;
-
-      Toast.show({ type: 'success', text1: 'Éxito', text2: 'Servicio solicitado correctamente.' });
-      // Navegar a la pantalla de reservas o dashboard después de éxito
-      router.push('/(tabs)/bookings'); 
+      if (error) {
+         // Manejar posible error RLS aquí también si la política no está aplicada
+         if (error.message.includes('row-level security policy')) {
+             Toast.show({ type: 'error', text1: 'Error de Permiso', text2: 'No se pudo guardar la reserva. Verifica los permisos.' });
+         } else {
+            throw error; // Re-lanzar otros errores
+         }
+      } else {
+        Toast.show({ type: 'success', text1: 'Éxito', text2: 'Servicio solicitado correctamente.' });
+        router.push('/(tabs)/bookings'); 
+      }
 
     } catch (error) {
+       console.error("Error submitting booking:", error);
        Toast.show({
         type: 'error',
         text1: 'Error al solicitar',
@@ -154,49 +165,53 @@ export default function RequestServiceScreen() {
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
       >
-        {loading && !services.length ? ( // Indicador de carga inicial
+        {(loading && (!services.length || !userId)) ? ( 
           <ActivityIndicator size="large" color={theme.colors.primary} style={{ marginTop: 50}} />
         ) : (
           <>
-            {/* Selección de Servicio (Usando botones por simplicidad) */}
+            {/* Sección: Selección de Servicio con Picker */}
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Selecciona un Paquete</Text>
-              {services.map((service) => (
-                <TouchableOpacity 
-                  key={service.id} 
-                  style={[
-                    styles.serviceButton, 
-                    selectedServiceId === service.id && styles.serviceButtonSelected
-                  ]}
-                  onPress={() => setSelectedServiceId(service.id)}
-                >
-                  <Text style={[
-                    styles.serviceButtonText,
-                    selectedServiceId === service.id && styles.serviceButtonTextSelected
-                  ]}>{service.name}</Text>
-                   <Text style={[
-                    styles.serviceButtonPrice,
-                    selectedServiceId === service.id && styles.serviceButtonTextSelected
-                  ]}>${service.base_price} - {service.duration_minutes} min</Text>
-                </TouchableOpacity>
-              ))}
-              {/* Alternativa con Picker:
-              <View style={styles.pickerWrapper}>
+              <View style={styles.pickerWrapper}> 
                  <Picker
                     selectedValue={selectedServiceId}
                     onValueChange={(itemValue) => setSelectedServiceId(itemValue)}
-                    style={styles.picker}
+                    style={styles.picker} // Asegúrate de tener estilos definidos
+                    mode="dropdown" // Opcional para Android
                   >
-                    <Picker.Item label="-- Selecciona un servicio --" value={null} />
+                    {/* Opción por defecto */}
+                    <Picker.Item label="-- Selecciona un paquete --" value={null} />
+                    {/* Mapear servicios obtenidos de Supabase */}
                     {services.map(service => (
-                      <Picker.Item key={service.id} label={`${service.name} ($${service.base_price})`} value={service.id} />
+                      <Picker.Item 
+                        key={service.id} 
+                        label={`${service.name} ($${service.base_price}) - ${service.duration_minutes} min`} 
+                        value={service.id} 
+                      />
                     ))}
                   </Picker>
-               </View> 
-              */}
+              </View>
             </View>
 
-            {/* Selección de Fecha y Hora */}
+            {/* Sección: Selección de Frecuencia */}            
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Frecuencia</Text>
+              <View style={styles.pickerWrapper}>
+                 <Picker
+                    selectedValue={frequency}
+                    onValueChange={(itemValue) => setFrequency(itemValue)}
+                    style={styles.picker}
+                    mode="dropdown"
+                  >
+                    <Picker.Item label="Una Vez" value="una_vez" />
+                    <Picker.Item label="Semanal" value="semanal" />
+                    <Picker.Item label="Quincenal" value="quincenal" />
+                    <Picker.Item label="Mensual" value="mensual" />
+                  </Picker>
+              </View>
+            </View>
+
+            {/* Sección: Selección de Fecha y Hora */}
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Fecha y Hora</Text>
               <View style={styles.dateTimeRow}>
@@ -204,12 +219,13 @@ export default function RequestServiceScreen() {
                     <Calendar size={20} color={theme.colors.primary} />
                     <Text style={styles.dateButtonText}>{formatDate(date)}</Text>
                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.dateButton} onPress={() => setShowTimePicker(true)}>
+                 <TouchableOpacity style={styles.dateButton} onPress={() => setShowTimePicker(true)}>
                     <Clock size={20} color={theme.colors.primary} />
                     <Text style={styles.dateButtonText}>{formatTime(date)}</Text>
                  </TouchableOpacity>
               </View>
              
+              {/* Renderizar DatePicker si showDatePicker es true */} 
               {showDatePicker && (
                 <DateTimePicker
                   testID="datePicker"
@@ -218,10 +234,11 @@ export default function RequestServiceScreen() {
                   is24Hour={false}
                   display="default"
                   onChange={onChangeDate}
-                  minimumDate={new Date()} // No permitir fechas pasadas
+                  minimumDate={new Date()} 
                 />
               )}
-               {showTimePicker && (
+              {/* Renderizar TimePicker si showTimePicker es true */} 
+              {showTimePicker && (
                 <DateTimePicker
                   testID="timePicker"
                   value={date}
@@ -229,12 +246,11 @@ export default function RequestServiceScreen() {
                   is24Hour={false}
                   display="default"
                   onChange={onChangeTime}
-                  // Podrías añadir restricciones de minutos si es necesario (minuteInterval)
                 />
               )}
             </View>
 
-            {/* Dirección */}
+            {/* Sección: Dirección */}
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Dirección de Limpieza</Text>
               <View style={styles.inputWrapper}>
@@ -245,15 +261,15 @@ export default function RequestServiceScreen() {
                   value={address}
                   onChangeText={setAddress}
                   placeholderTextColor={theme.colors.text.light}
-                  multiline // Permitir múltiples líneas si es necesario
+                  multiline
                 />
               </View>
             </View>
 
-            {/* Instrucciones Especiales */}
+            {/* Sección: Instrucciones Especiales */}
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Instrucciones Especiales (Opcional)</Text>
-               <View style={styles.inputWrapper}>
+              <View style={styles.inputWrapper}>
                 <FileText size={20} color={theme.colors.text.light} style={styles.inputIcon} />
                 <TextInput
                   style={[styles.input, styles.textArea]}
@@ -267,7 +283,7 @@ export default function RequestServiceScreen() {
               </View>
             </View>
 
-             {/* Botón de Solicitar */}
+            {/* Botón de Solicitar */}
             <TouchableOpacity 
               style={[styles.submitButton, loading && styles.submitButtonDisabled]} 
               onPress={handleSubmit}

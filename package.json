@@ -12,7 +12,6 @@
   "dependencies": {
     "@expo/vector-icons": "^14.0.2",
     "@react-native-async-storage/async-storage": "1.23.1",
-    "@react-native-community/datetimepicker": "^8.3.0",
     "@supabase/supabase-js": "^2.49.4",
     "bcryptjs": "^3.0.2",
     "expo": "~52.0.42",
@@ -34,7 +33,9 @@
     "react-native-screens": "~4.4.0",
     "react-native-toast-message": "^2.2.1",
     "react-native-url-polyfill": "^2.0.0",
-    "react-native-web": "^0.19.13"
+    "react-native-web": "^0.19.13",
+    "@react-native-community/datetimepicker": "8.2.0",
+    "@react-native-picker/picker": "2.9.0"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
