@@ -1,9 +1,9 @@
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, KeyboardAvoidingView, ScrollView, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ArrowLeft, User, Mail, Lock, Phone } from 'lucide-react-native';
-import { theme } from './theme';
+import { theme } from '../theme';
 import { useState } from 'react';
-import { supabase } from '../lib/supabase';
+import { supabase } from '../../lib/supabase';
 import Toast from 'react-native-toast-message';
 // Quitar AsyncStorage si no se usa más para sesión de Supabase Auth
 // import AsyncStorage from '@react-native-async-storage/async-storage'; 
@@ -129,7 +129,7 @@ export default function EmployeeSignup() {
             email: formData.email, 
             full_name: formData.fullName,
             phone_number: formData.phone,
-            role: 'limpiador' // Establecer rol aquí
+            role: 'employee' // Asegurar que sea 'employee'
           }
         ]);
 
@@ -166,7 +166,7 @@ export default function EmployeeSignup() {
 
       // No es necesario iniciar sesión aquí, el usuario ya está "logueado" tras signUp
       // Pero sí redirigimos
-      router.replace('/(employee)/'); // Ajustar la ruta si es necesario
+      // router.replace('/(employee)/'); // Ajustar la ruta si es necesario
 
     } catch (error) {
       Toast.show({
@@ -179,6 +179,16 @@ export default function EmployeeSignup() {
     }
   };
 
+  // Nueva función para manejar el botón atrás
+  const handleBackPress = () => {
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      // Si no se puede volver, ir a la pantalla inicial
+      router.replace('/'); 
+    }
+  };
+
   return (
     <KeyboardAvoidingView 
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -187,7 +197,7 @@ export default function EmployeeSignup() {
       <View style={styles.header}>
         <TouchableOpacity 
           style={styles.backButton}
-          onPress={() => router.back()}
+          onPress={handleBackPress}
           activeOpacity={0.8}
         >
           <ArrowLeft size={24} color={theme.colors.surface} />

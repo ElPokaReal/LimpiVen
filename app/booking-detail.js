@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert, Platform, Modal } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { supabase } from '../lib/supabase';
 import { theme } from './theme';
 import Toast from 'react-native-toast-message';
-import { ArrowLeft, Calendar, Clock, MapPin, User, FileText, CheckCircle, XCircle } from 'lucide-react-native';
+import { ArrowLeft, Calendar, Clock, MapPin, User, FileText, CheckCircle, XCircle, Star } from 'lucide-react-native';
+import RatingModal from './components/RatingModal';
 
 export default function BookingDetailScreen() {
   const router = useRouter();
@@ -12,6 +13,8 @@ export default function BookingDetailScreen() {
   const [booking, setBooking] = useState(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false); // Para botones Aceptar/Rechazar
+  const [isRatingModalVisible, setIsRatingModalVisible] = useState(false);
+  const [currentUserRole, setCurrentUserRole] = useState(null); // Para saber si es cliente o limpiador
 
   // --- Función para cargar detalles --- 
   const fetchBookingDetails = useCallback(async () => {
@@ -27,12 +30,17 @@ export default function BookingDetailScreen() {
         .select(`
           id,
           scheduled_date,
-          address,
           status,
           frequency,
           special_instructions,
           client:users!bookings_client_id_fkey ( full_name, phone_number ), 
-          service:services ( name, base_price, duration_minutes )
+          service:services ( name, base_price, duration_minutes ),
+          location:user_locations (
+            address_line1,
+            address_line2,
+            nickname
+          ),
+          reviews ( count )
         `)
         .eq('id', bookingId)
         .single(); // Esperamos solo un resultado
@@ -63,6 +71,26 @@ export default function BookingDetailScreen() {
       setLoading(false);
     }
   }, [bookingId, router]);
+
+  // --- Determinar rol del usuario --- (Hacerlo una sola vez)
+  useEffect(() => {
+    const getUserRole = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      // Asumiendo que tienes una tabla 'users' o un campo en 'auth.users.raw_user_meta_data' con el rol
+      // Ajusta esta parte según cómo almacenes el rol
+      if (user) {
+        const { data: userData, error: userError } = await supabase
+          .from('users') 
+          .select('role')
+          .eq('id', user.id)
+          .single();
+        if (userData) {
+          setCurrentUserRole(userData.role);
+        }
+      }
+    };
+    getUserRole();
+  }, []);
 
   // --- Carga inicial --- 
   useEffect(() => {
@@ -134,6 +162,44 @@ export default function BookingDetailScreen() {
     }
   };
 
+  // --- Función para Enviar Calificación (Cliente) ---
+  const submitReview = async (rating, comment) => {
+    if (!booking || !booking.client_id || !booking.cleaner_id || !rating) {
+       Toast.show({ type: 'error', text1: 'Datos incompletos', text2: 'Faltan datos para enviar la reseña.' });
+       return;
+    }
+     if (rating < 1 || rating > 5) {
+         Toast.show({ type: 'error', text1: 'Calificación inválida', text2: 'La calificación debe ser entre 1 y 5.' });
+         return;
+     }
+
+    setActionLoading(true); // Reusar estado de carga o crear uno nuevo
+    try {
+      const { error } = await supabase
+        .from('reviews')
+        .insert({
+          booking_id: booking.id,
+          client_id: booking.client_id, // El cliente de la reserva
+          cleaner_id: booking.cleaner_id, // El limpiador de la reserva
+          rating: rating,
+          comment: comment || null
+        });
+      
+      if (error) throw error;
+
+      Toast.show({ type: 'success', text1: 'Reseña Enviada', text2: '¡Gracias por tu calificación!' });
+      setIsRatingModalVisible(false); // Cerrar modal
+      // Refrescar datos para que el botón desaparezca (o actualizar estado local)
+      fetchBookingDetails(); 
+
+    } catch (error) {
+      console.error("Error submitting review:", error);
+      Toast.show({ type: 'error', text1: 'Error al enviar reseña', text2: error.message });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   // --- Alerta de confirmación ---
   const confirmAction = (actionType) => {
       const title = actionType === 'accept' ? 'Confirmar Servicio' : 'Rechazar Servicio';
@@ -182,7 +248,10 @@ export default function BookingDetailScreen() {
   }
 
   // Solo mostrar botones si el estado es 'pendiente'
-  const showActionButtons = booking.status === 'pendiente';
+  const showActionButtons = currentUserRole === 'limpiador' && booking.status === 'pendiente';
+
+  // Mostrar botón de calificar si el usuario es cliente, el estado es 'completado' y no hay reseñas
+  const showRateButton = currentUserRole === 'cliente' && booking.status === 'completado' && booking.reviews?.[0]?.count === 0;
 
   return (
     <View style={styles.outerContainer}>
@@ -234,7 +303,11 @@ export default function BookingDetailScreen() {
               <Text style={styles.sectionTitle}>Dirección</Text>
                <View style={styles.detailRow}>
                  <MapPin size={18} color={theme.colors.text.secondary}/>
-                 <Text style={styles.detailValue}>{booking.address || 'No especificada'}</Text>
+                 <Text style={styles.detailValue}>{ 
+                    booking.location
+                    ? `${booking.location.address_line1}${booking.location.address_line2 ? ', '+booking.location.address_line2 : ''}${booking.location.nickname ? ` (${booking.location.nickname})`: ''}` 
+                    : 'No especificada'
+                 }</Text>
               </View>
           </View>
 
@@ -277,8 +350,34 @@ export default function BookingDetailScreen() {
             </View>
           )}
 
+          {/* --- BOTÓN DE CALIFICACIÓN (Cliente) --- */}
+          {showRateButton && (
+              <View style={styles.rateButtonContainer}> 
+                 <TouchableOpacity 
+                    style={styles.rateButton} 
+                    onPress={() => setIsRatingModalVisible(true)} // Abrir modal
+                    disabled={actionLoading} // Deshabilitar si se está enviando
+                 >
+                    <Star size={20} color={theme.colors.white} /> 
+                    <Text style={styles.rateButtonText}>Calificar este Servicio</Text>
+                    {actionLoading && <ActivityIndicator color={theme.colors.white} style={{marginLeft: 10}}/>}
+                 </TouchableOpacity>
+              </View>
+          )}
+
       </ScrollView>
-       <Toast />
+
+      {/* --- MODAL DE CALIFICACIÓN --- */}
+      {booking && (
+          <RatingModal 
+              isVisible={isRatingModalVisible}
+              onClose={() => setIsRatingModalVisible(false)}
+              onSubmit={submitReview} // Pasar la función de envío
+              bookingServiceName={booking.service?.name || 'el servicio'} // Nombre para el título
+          />
+      )}
+
+      <Toast />
     </View>
   );
 }
@@ -396,5 +495,26 @@ const styles = StyleSheet.create({
   },
   rejectButtonText: {
     color: theme.colors.error,
+  },
+  rateButtonContainer: {
+      padding: theme.spacing.lg,
+      borderTopWidth: 1,
+      borderTopColor: theme.colors.border,
+      backgroundColor: theme.colors.background, // Fondo similar
+  },
+  rateButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: theme.colors.primary, // Color primario
+      paddingVertical: theme.spacing.lg, // Más grande
+      borderRadius: theme.borderRadius.lg,
+      gap: theme.spacing.sm,
+      ...theme.shadows.md,
+  },
+  rateButtonText: {
+      ...theme.typography.button,
+      color: theme.colors.white,
+      fontWeight: 'bold',
   },
 }); 

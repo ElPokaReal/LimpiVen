@@ -1,0 +1,125 @@
+import { View, Text, StyleSheet, TouchableOpacity, Image, Dimensions } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useRouter } from 'expo-router';
+import { theme } from './theme'; // Asume que theme.js está en la raíz de /app
+
+const { width } = Dimensions.get('window');
+
+export default function PrincipalScreen() {
+  const router = useRouter();
+
+  return (
+    <View style={styles.container}>
+      <LinearGradient
+        colors={['rgba(108, 99, 255, 0.1)', 'rgba(255, 101, 132, 0.05)']}
+        style={styles.gradient}
+      />
+      
+      <Image 
+        source={{ uri: 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?q=80&w=2070' }}
+        style={styles.backgroundImage}
+      />
+
+      <View style={styles.content}>
+        <View>
+          <Text style={styles.title}>LimpiVen</Text>
+          <Text style={styles.subtitle}>Aseo al instante, resultados brillantes!</Text>
+        </View>
+
+        <View style={styles.buttonContainer}>
+          <TouchableOpacity
+            style={styles.button}
+            // Redirige a la pantalla de login/signup dentro del grupo (auth)
+            onPress={() => router.push('/(auth)/auth')} 
+            activeOpacity={0.8}
+          >
+            <Text style={styles.buttonText}>Iniciar Sesión o Registrarse</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.button, styles.employeeButton]}
+             // Redirige a la pantalla de signup de empleado dentro del grupo (auth)
+            onPress={() => router.push('/(auth)/employee-signup')}
+            activeOpacity={0.8}
+          >
+            <Text style={[styles.buttonText, styles.employeeButtonText]}>
+              ¿Deseas ser empleado? ¡Regístrate!
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+// Estilos (idénticos a los de index.js)
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    // width: width * 0.9, // Puede que quieras que ocupe todo el ancho
+    // maxWidth: 500,
+    alignSelf: 'center',
+    justifyContent: 'center',
+    backgroundColor: theme.colors.background,
+    width: '100%', // Ocupar todo el ancho disponible
+  },
+  backgroundImage: {
+    position: 'absolute',
+    width: '100%',
+    height: '100%',
+    opacity: 0.2,
+  },
+  gradient: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    height: '100%',
+    zIndex: 1,
+  },
+  content: {
+    flex: 1,
+    justifyContent: 'space-between',
+    padding: theme.spacing.xl,
+    zIndex: 2,
+    maxWidth: 500, // Limitar ancho del contenido si es necesario
+    width: '90%',
+    alignSelf: 'center',
+  },
+  title: {
+    ...theme.typography.h1,
+    color: theme.colors.primary,
+    marginBottom: theme.spacing.sm,
+    textAlign: 'center',
+  },
+  subtitle: {
+    ...theme.typography.body,
+    color: theme.colors.text.secondary,
+    marginBottom: theme.spacing.xxl,
+    textAlign: 'center',
+  },
+  buttonContainer: {
+    gap: theme.spacing.md,
+    marginBottom: theme.spacing.xxl,
+  },
+  button: {
+    backgroundColor: theme.colors.primary,
+    paddingVertical: theme.spacing.lg,
+    paddingHorizontal: theme.spacing.xl,
+    borderRadius: theme.borderRadius.lg,
+    alignItems: 'center',
+    ...theme.shadows.md,
+  },
+  buttonText: {
+    ...theme.typography.button,
+    color: theme.colors.surface,
+  },
+  employeeButton: {
+    backgroundColor: theme.colors.surface,
+    borderWidth: 2,
+    borderColor: theme.colors.primary,
+  },
+  employeeButtonText: {
+    color: theme.colors.primary,
+  },
+}); 

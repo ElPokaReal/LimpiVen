@@ -1,9 +1,9 @@
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ArrowLeft, User, Mail, Lock, Phone } from 'lucide-react-native';
-import { theme } from './theme';
+import { theme } from '../theme';
 import { useState } from 'react';
-import { supabase } from '../lib/supabase';
+import { supabase } from '../../lib/supabase';
 import Toast from 'react-native-toast-message';
 
 export default function ClientSignup() {
@@ -109,7 +109,7 @@ export default function ClientSignup() {
             // password_hash ya no es necesario aquí
             full_name: formData.fullName,
             phone_number: formData.phone,
-            role: 'cliente' // Definir rol aquí
+            role: 'client' // Asegurar que sea 'client'
           }
         ]);
         // No necesitamos .select().single() aquí a menos que necesitemos los datos de vuelta
@@ -167,7 +167,6 @@ export default function ClientSignup() {
         text1: 'Éxito',
         text2: 'Cuenta creada correctamente. Revisa tu email para confirmar.' // Ajustar si aplica
       });
-      router.replace('/(tabs)'); // Redirigir a la pestaña de cliente
 
     } catch (error) {
        // Captura de errores inesperados generales
@@ -187,12 +186,22 @@ export default function ClientSignup() {
     }
   };
 
+  // Nueva función para manejar el botón atrás
+  const handleBackPress = () => {
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      // Si no se puede volver, ir a la pantalla inicial
+      router.replace('/'); 
+    }
+  };
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity 
           style={styles.backButton}
-          onPress={() => router.back()}
+          onPress={handleBackPress} // Usar la nueva función
           activeOpacity={0.8}
         >
           <ArrowLeft size={24} color={theme.colors.surface} />

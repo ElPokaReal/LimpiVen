@@ -31,10 +31,14 @@ export default function EmployeeServices() {
       const selectQuery = `
         id,
         scheduled_date,
-        address,
         status,
         client:users!bookings_client_id_fkey ( full_name ), 
-        service:services ( name )
+        service:services ( name ),
+        location:user_locations (
+          address_line1,
+          address_line2,
+          nickname
+        )
       `;
       const { data: bookingsData, error: bookingsError } = await supabase
         .from('bookings')
@@ -150,7 +154,11 @@ export default function EmployeeServices() {
                   </View>
                   <View style={styles.detailRow}>
                     <MapPin size={16} color={theme.colors.text.secondary} />
-                    <Text style={styles.detailText} numberOfLines={1}>{booking.address || 'Dirección no especificada'}</Text>
+                    <Text style={styles.detailText} numberOfLines={1}>{ 
+                      booking.location
+                      ? `${booking.location.address_line1}${booking.location.address_line2 ? ', '+booking.location.address_line2 : ''}`
+                      : 'Dirección no especificada'
+                    }</Text>
                   </View>
                 </View>
                  <View style={styles.cardFooter}>

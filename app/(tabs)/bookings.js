@@ -34,9 +34,12 @@ export default function BookingsScreen() {
         .select(`
           id,
           scheduled_date,
-          address,
           status,
-          services ( name )
+          services ( name ),
+          location:user_locations (
+            address_line1,
+            address_line2
+          )
         `)
         .eq('client_id', user.id) // <- Usar user.id directamente
         .order('scheduled_date', { ascending: false });
@@ -166,7 +169,11 @@ export default function BookingsScreen() {
                             </View>
                             <View style={styles.detailRow}>
                                 <MapPin size={16} color={theme.colors.text.secondary} />
-                                <Text style={styles.detailText}>{booking.address || 'Dirección no especificada'}</Text>
+                                <Text style={styles.detailText}>{
+                                  booking.location 
+                                  ? `${booking.location.address_line1}${booking.location.address_line2 ? ', '+booking.location.address_line2 : ''}`
+                                  : 'Dirección no especificada'
+                                }</Text>
                             </View>
                         </View>
                         </TouchableOpacity>

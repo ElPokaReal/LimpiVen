@@ -1,12 +1,39 @@
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native';
 import { theme } from '../theme';
+import { useRouter } from 'expo-router';
+import { Briefcase } from 'lucide-react-native';
 
 // Este es ahora el dashboard principal para el grupo (employee)
 export default function EmployeeDashboardIndex() { 
+  const router = useRouter();
+
+  const navigateToAcceptedServices = () => {
+    router.push('/accepted-services');
+  };
+
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Dashboard de Empleado</Text>
-      {/* Aquí irá el contenido del dashboard */}
+      <View style={styles.header}>
+         <Text style={styles.title}>Dashboard</Text>
+      </View>
+
+      {/* Contenido del Dashboard */}
+      <View style={styles.content}>
+          {/* Puedes añadir más elementos al dashboard aquí */}
+          
+          {/* Botón para Servicios Aceptados */}
+          <TouchableOpacity 
+            style={styles.dashboardButton}
+            onPress={navigateToAcceptedServices}
+            activeOpacity={0.7}
+          >
+            <Briefcase size={24} color={theme.colors.primary} />
+            <Text style={styles.buttonText}>Mis Servicios Aceptados</Text>
+          </TouchableOpacity>
+          
+          {/* Otros botones o información */}
+
+      </View>
     </View>
   );
 }
@@ -14,12 +41,39 @@ export default function EmployeeDashboardIndex() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
     backgroundColor: theme.colors.background,
+  },
+  header: {
+    padding: theme.spacing.lg,
+    paddingHorizontal: theme.spacing.xl,
+    paddingTop: Platform.OS === 'android' ? theme.spacing.xl + 10 : 48,
+    backgroundColor: theme.colors.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
+    marginBottom: theme.spacing.lg,
   },
   title: {
     ...theme.typography.h1,
     color: theme.colors.text.primary,
   },
+  content: {
+    flex: 1,
+    paddingHorizontal: theme.spacing.lg,
+  },
+  dashboardButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.colors.surface,
+    paddingVertical: theme.spacing.lg,
+    paddingHorizontal: theme.spacing.md,
+    borderRadius: theme.borderRadius.md,
+    ...theme.shadows.sm,
+    marginBottom: theme.spacing.md,
+    gap: theme.spacing.md,
+  },
+  buttonText: {
+    ...theme.typography.button,
+    color: theme.colors.text.primary,
+    fontSize: 16,
+  }
 }); 

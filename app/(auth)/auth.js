@@ -1,10 +1,11 @@
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ArrowLeft, Mail, Lock } from 'lucide-react-native';
-import { theme } from './theme';
+import { theme } from '../theme';
 import { useState } from 'react';
-import { supabase } from '../lib/supabase';
+import { supabase } from '../../lib/supabase';
 import Toast from 'react-native-toast-message';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function Auth() {
   const router = useRouter();
@@ -12,94 +13,148 @@ export default function Auth() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
+  // Función auxiliar para mostrar errores con Toast
+  const showErrorToast = (message, title = 'Error') => {
+    Toast.show({ type: 'error', text1: title, text2: message });
+  };
+
+  // Función auxiliar para guardar datos del usuario en AsyncStorage
+  const saveUserDataLocally = async (user, userDataFromDB) => {
+    try {
+      await AsyncStorage.setItem('id', user.id);
+      await AsyncStorage.setItem('email', user.email);
+      // Asegurarse que userDataFromDB.full_name no sea null o undefined
+      const fullName = userDataFromDB?.full_name || '';
+      await AsyncStorage.setItem('full_name', fullName);
+      console.log("User data saved to AsyncStorage:", { id: user.id, email: user.email, name: fullName });
+      return true; // Indica éxito
+    } catch (storageError) {
+      console.error("Error saving user data to AsyncStorage:", storageError);
+      showErrorToast('No se pudo guardar la información localmente.', 'Error de almacenamiento');
+      return false; // Indica fallo
+    }
+  };
+
+  // Función auxiliar para obtener datos adicionales del usuario desde la DB
+  const fetchUserDataFromDB = async (userId) => {
+    const { data, error } = await supabase
+        .from('users')
+        .select('role, full_name') // Solo pedimos lo que necesitamos aquí
+        .eq('id', userId)
+        .single();
+
+    if (error) {
+        console.error("Error fetching user data from DB:", error);
+        showErrorToast('No se pudo obtener la información completa del usuario.');
+        return null;
+    }
+    if (!data) {
+        showErrorToast('Perfil de usuario no encontrado en la base de datos.');
+        return null;
+    }
+    return data; // Devuelve { role, full_name }
+  };
+
+  // Lógica principal de inicio de sesión refactorizada
   const handleLogin = async () => {
     setLoading(true);
-    try {
-      if (!email || !password) {
-        Toast.show({
-          type: 'error',
-          text1: 'Error',
-          text2: 'Por favor ingresa tu email y contraseña'
-        });
-        return;
-      }
 
-      // 1. Iniciar sesión con Supabase Auth
+    // 1. Validación básica de campos
+    if (!email || !password) {
+      showErrorToast('Por favor ingresa tu email y contraseña');
+      setLoading(false);
+      return;
+    }
+
+    try {
+      // 2. Autenticar con Supabase Auth
       const { data: authData, error: signInError } = await supabase.auth.signInWithPassword({
         email: email,
         password: password,
       });
 
       if (signInError) {
-        // Manejar errores específicos de Supabase si es necesario
         if (signInError.message.includes('Invalid login credentials')) {
-          Toast.show({ type: 'error', text1: 'Error', text2: 'Credenciales incorrectas' });
+          showErrorToast('Credenciales incorrectas');
         } else {
-          Toast.show({ type: 'error', text1: 'Error de inicio de sesión', text2: signInError.message });
+          console.error("Supabase sign in error:", signInError);
+          showErrorToast(signInError.message, 'Error de inicio de sesión');
         }
+        setLoading(false);
         return;
       }
       
-      // Verificar que tenemos un usuario autenticado
-      if (!authData || !authData.user) {
-           Toast.show({ type: 'error', text1: 'Error', text2: 'No se pudo obtener la información del usuario.' });
+      if (!authData?.user) {
+           showErrorToast('No se pudo obtener la información del usuario tras el login.');
+           setLoading(false);
            return;
-      }
-
-      // 2. Obtener el rol del usuario desde la tabla 'users' (necesario para redirección)
-      // Asegúrate de que las políticas RLS permitan al usuario leer su propia fila en 'users'
-      // La política "Users can view their own data" ON users FOR SELECT USING (auth.uid() = id); debería funcionar.
-      const { data: userData, error: userError } = await supabase
-          .from('users')
-          .select('role')
-          .eq('id', authData.user.id)
-          .single();
-
-      if (userError) {
-          console.error("Error fetching user role:", userError);
-          Toast.show({ type: 'error', text1: 'Error', text2: 'No se pudo verificar el rol del usuario.' });
-          // Considerar desloguear si no podemos obtener el rol? supabase.auth.signOut();
-          return;
       }
       
-      if (!userData) {
-          Toast.show({ type: 'error', text1: 'Error', text2: 'Perfil de usuario no encontrado en la base de datos.' });
-          // Considerar desloguear
-           return;
+      const user = authData.user;
+
+      // 3. Obtener datos adicionales (rol, nombre) de la tabla 'users'
+      const userDataFromDB = await fetchUserDataFromDB(user.id);
+      if (!userDataFromDB) {
+          // fetchUserDataFromDB ya muestra el Toast en caso de error
+          setLoading(false);
+          return;
       }
 
-      // 3. Redirección basada en rol
+      // 4. Guardar datos esenciales en AsyncStorage
+      const saved = await saveUserDataLocally(user, userDataFromDB);
+      if (!saved) {
+          // saveUserDataLocally ya muestra el Toast en caso de error
+          setLoading(false);
+          return;
+      }
+
+      // 5. Redirección basada en rol
       Toast.show({
         type: 'success',
         text1: 'Éxito',
         text2: 'Sesión iniciada correctamente'
       });
 
-      const userRole = userData.role;
+      const userRole = userDataFromDB.role;
       if (userRole === 'limpiador') {
         router.replace('/(employee)/'); 
       } else if (userRole === 'cliente') {
-        router.replace('/(tabs)/'); 
+        router.replace('/(tabs)/');
       } else {
         console.warn('Rol de usuario desconocido o no manejado:', userRole);
-        router.replace('/(tabs)/'); // Redirigir a cliente por defecto
+        // Idealmente, no deberíamos llegar aquí si la DB está bien, pero por si acaso:
+        showErrorToast(`Rol '${userRole}' no reconocido. Contacte soporte.`); 
+        // O podrías redirigir a '/' pero mostrando error primero
+         router.replace('/'); 
       }
       
     } catch (error) {
-      // Captura errores inesperados
+      // Captura errores generales inesperados durante el proceso
       console.error("Unexpected login error:", error);
-      Toast.show({
-        type: 'error',
-        text1: 'Error inesperado',
-        text2: error instanceof Error ? error.message : 'Ocurrió un error desconocido'
-      });
+      showErrorToast(error instanceof Error ? error.message : 'Ocurrió un error desconocido', 'Error inesperado');
     } finally {
-      setLoading(false);
+      // Asegurarse de que loading se desactive siempre
+      setLoading(false); 
     }
   };
 
   const handleSignUp = () => {
     router.push('/client-signup');
+  };
+
+  const handleForgotPassword = () => {
+    // TODO: Implementar navegación a pantalla de olvido de contraseña
+    Toast.show({ type: 'info', text1: 'Próximamente', text2: 'Función de recuperar contraseña aún no implementada.'})
+    // router.push('/forgot-password'); 
+  };
+
+  const handleBackPress = () => {
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      // Si no se puede volver, ir a la pantalla inicial pública
+      router.replace('/'); // Asumiendo que '/' será la pantalla pública principal
+    }
   };
 
   return (
@@ -110,7 +165,7 @@ export default function Auth() {
       <View style={styles.header}>
         <TouchableOpacity 
           style={styles.backButton}
-          onPress={() => router.back()}
+          onPress={handleBackPress}
           activeOpacity={0.8}
         >
           <ArrowLeft size={24} color={theme.colors.surface} />
@@ -154,6 +209,7 @@ export default function Auth() {
           <TouchableOpacity 
             style={styles.forgotPassword}
             activeOpacity={0.8}
+            onPress={handleForgotPassword} 
           >
             <Text style={styles.forgotPasswordText}>¿Olvidaste tu contraseña?</Text>
           </TouchableOpacity>
@@ -252,6 +308,8 @@ const styles = StyleSheet.create({
   },
   buttonContainer: {
     gap: theme.spacing.md,
+    marginTop: 'auto',
+    paddingBottom: theme.spacing.md,
   },
   button: {
     backgroundColor: theme.colors.primary,

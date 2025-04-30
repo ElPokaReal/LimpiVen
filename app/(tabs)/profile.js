@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../../lib/supabase';
 import { theme } from '../theme';
+import { Toast } from 'react-native-toast-message';
 
 export default function Profile() {
   const router = useRouter();
@@ -14,6 +15,7 @@ export default function Profile() {
     email: ''
   });
   const [refreshing, setRefreshing] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const loadUserData = async () => {
     const name = await AsyncStorage.getItem('full_name');
@@ -90,8 +92,21 @@ export default function Profile() {
   }, [fadeAnim]);
 
   const handleLogout = async () => {
-    await AsyncStorage.clear();
-    router.replace('/');
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        console.error("Error signing out:", error);
+        Toast.show({ type: 'error', text1: 'Error', text2: 'No se pudo cerrar sesión.' });
+      } else {
+        console.log("User signed out successfully.");
+      }
+    } catch (e) {
+        console.error("Unexpected error during sign out:", e);
+        Toast.show({ type: 'error', text1: 'Error', text2: 'Ocurrió un error inesperado.' });
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
