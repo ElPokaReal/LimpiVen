@@ -10,6 +10,7 @@ import RatingModal from './components/RatingModal';
 export default function BookingDetailScreen() {
   const router = useRouter();
   const { bookingId } = useLocalSearchParams(); // Obtener el ID de los parámetros de ruta
+  console.log('[BookingDetailScreen] Rendering - Received bookingId:', bookingId);
   const [booking, setBooking] = useState(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false); // Para botones Aceptar/Rechazar
@@ -18,22 +19,26 @@ export default function BookingDetailScreen() {
 
   // --- Función para cargar detalles --- 
   const fetchBookingDetails = useCallback(async () => {
-    if (!bookingId) {
-      Toast.show({ type: 'error', text1: 'Error', text2: 'ID de reserva no encontrado.' });
-      router.back();
-      return;
-    }
+    // if (!bookingId) { // Comprobación movida al useEffect
+    //   Toast.show({ type: 'error', text1: 'Error', text2: 'ID de reserva no encontrado.' });
+    //   router.back();
+    //   return;
+    // }
     setLoading(true);
+    console.log(`[BookingDetailScreen] fetchBookingDetails - Attempting to fetch ID: ${bookingId}`);
     try {
       const { data, error } = await supabase
         .from('bookings')
         .select(`
           id,
+          client_id,
+          cleaner_id,
           scheduled_date,
           status,
           frequency,
           special_instructions,
           client:users!bookings_client_id_fkey ( full_name, phone_number ), 
+          cleaner:users!bookings_cleaner_id_fkey ( id, full_name ),
           service:services ( name, base_price, duration_minutes ),
           location:user_locations (
             address_line1,
@@ -46,6 +51,7 @@ export default function BookingDetailScreen() {
         .single(); // Esperamos solo un resultado
 
       if (error) {
+          console.error('[BookingDetailScreen] fetchBookingDetails - Supabase Error:', error);
           if (error.code === 'PGRST116') { // Código para "0 rows returned"
                Toast.show({ type: 'error', text1: 'No Encontrado', text2: 'La reserva solicitada no existe.' });
           } else if (error.message.includes("security policy")) {
@@ -55,11 +61,13 @@ export default function BookingDetailScreen() {
           }
            router.back(); // Volver si hay error
       } else {
+        console.log('[BookingDetailScreen] fetchBookingDetails - Data fetched:', data);
         console.log('Booking details:', data);
         setBooking(data);
       }
 
     } catch (error) {
+      console.error("[BookingDetailScreen] fetchBookingDetails - Caught Error:", error);
       console.error("Error fetching booking details:", error);
       Toast.show({
         type: 'error',
@@ -94,8 +102,16 @@ export default function BookingDetailScreen() {
 
   // --- Carga inicial --- 
   useEffect(() => {
-    fetchBookingDetails();
-  }, [fetchBookingDetails]);
+    console.log('[BookingDetailScreen] useEffect - Checking bookingId for fetch:', bookingId);
+    if (bookingId) { // Solo llamar si tenemos bookingId
+       console.log('[BookingDetailScreen] useEffect - Calling fetchBookingDetails');
+       fetchBookingDetails();
+    } else {
+       console.error('[BookingDetailScreen] useEffect - No bookingId found!');
+       Toast.show({type: 'error', text1: 'Error', text2: 'ID de reserva no proporcionado.'});
+       if(router.canGoBack()) router.back(); // Vuelve si no hay ID y se puede volver
+    }
+  }, [fetchBookingDetails, bookingId]);
 
   // --- Funciones para Aceptar / Rechazar ---
   const handleUpdateStatus = async (newStatus) => {
@@ -284,6 +300,26 @@ export default function BookingDetailScreen() {
                  <Text style={styles.detailValue}>{booking.client?.phone_number || 'N/A'}</Text>
               </View> */} 
           </View>
+
+          {/* --- Información del Limpiador (si está asignado) --- */}
+          {booking.cleaner && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Asignado a</Text>
+              <TouchableOpacity 
+                style={styles.detailRow} 
+                onPress={() => {
+                  // TODO: Navegar al perfil del limpiador
+                  console.log("Navegar al perfil de:", booking.cleaner.id);
+                  router.push({ pathname: '/cleaner-profile', params: { cleanerId: booking.cleaner.id } });
+                }}
+              >
+                 {/* Podríamos añadir un icono o avatar aquí si tenemos booking.cleaner.avatar_url */}
+                 <User size={18} color={theme.colors.text.secondary}/> 
+                 <Text style={[styles.detailValue, styles.linkText]}>{booking.cleaner.full_name}</Text>
+                 {/* Añadir un pequeño icono de flecha o similar podría ser útil */}
+              </TouchableOpacity>
+            </View>
+          )}
 
           {/* Fecha y Hora */}          
           <View style={styles.section}>
@@ -516,5 +552,10 @@ const styles = StyleSheet.create({
       ...theme.typography.button,
       color: theme.colors.white,
       fontWeight: 'bold',
+  },
+  // Añadir estilo para el texto del enlace
+  linkText: {
+    color: theme.colors.primary, 
+    textDecorationLine: 'underline',
   },
 }); 

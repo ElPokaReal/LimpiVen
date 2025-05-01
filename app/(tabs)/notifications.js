@@ -5,8 +5,40 @@ import { theme } from '../theme'; // Asegúrate que la ruta sea correcta
 import Toast from 'react-native-toast-message';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import Swipeable from 'react-native-gesture-handler/Swipeable';
-import { Trash2 } from 'lucide-react-native'; // Icono para eliminar
+import { Trash2, BellRing, CheckCircle, AlertCircle } from 'lucide-react-native'; // Añadir iconos relevantes
 import { useRouter } from 'expo-router'; // Importar useRouter
+
+// --- Helper para formatear y traducir tipos de notificación ---
+const formatNotification = (item) => {
+  let title = item.type; // Valor por defecto
+  let Icon = BellRing; // Icono por defecto
+  const message = item.message || 'Detalles no disponibles.'; // Mensaje principal
+
+  switch (item.type) {
+    case 'booking_confirmed':
+      title = 'Reserva Confirmada';
+      Icon = CheckCircle;
+      break;
+    case 'booking_cancelled':
+      title = 'Reserva Cancelada';
+      Icon = AlertCircle;
+      break;
+    case 'new_booking_request':
+      title = 'Nueva Solicitud de Reserva';
+      // Icon = ... (otro icono si quieres)
+      break;
+    case 'rating_reminder':
+        title = 'Califica tu último servicio';
+        // Icon = ...
+        break;
+    // Añade más casos según los tipos que uses
+    default:
+      // Intentar formatear un poco el tipo por defecto
+      title = item.type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+  }
+
+  return { title, message, Icon };
+};
 
 export default function Notifications() {
   const router = useRouter(); // Inicializar router
@@ -33,6 +65,7 @@ export default function Notifications() {
   // Función para obtener notificaciones (incluyendo related_entity_id)
   const fetchNotifications = useCallback(async () => {
     if (!userId) return;
+    console.log('[Notifications] Fetching notifications for user:', userId); // Log para depuración
     setLoading(!refreshing);
     try {
       const { data, error } = await supabase
@@ -42,6 +75,7 @@ export default function Notifications() {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
+      console.log('[Notifications] Fetched data:', data); // Ver qué datos llegan
       setNotifications(data || []);
     } catch (error) {
       console.error("Error fetching notifications:", error);
@@ -82,14 +116,14 @@ export default function Notifications() {
 
       // Verificar explícitamente el error O si no se actualizó nada
       if (error || count === 0) { 
-        console.error("Error marking notification as read OR no rows updated:", error, "Count:", count);
+        console.warn("Error marking notification as read OR no rows updated:", error, "Count:", count); // Usar warn para diferenciar
         // Revertir el cambio local si falla la actualización en la DB
         setNotifications(prev => prev.map(n => 
             n.id === notificationId ? { ...n, is_read: false } : n
         ));
         // Mostrar mensaje más específico si es posible
-        const errorMessage = error ? error.message : 'No se pudo actualizar la notificación (posiblemente ya leída o RLS).'
-        Toast.show({ type: 'error', text1: 'Error', text2: errorMessage });
+        const errorMessage = error ? error.message : 'No se pudo actualizar la notificación (posiblemente ya leída).'
+        Toast.show({ type: 'warning', text1: 'Atención', text2: errorMessage }); // Usar warning
       } else {
           // Éxito: La suscripción en _layout.js debería actualizar el badge
           console.log('Notification successfully marked as read in DB:', notificationId, "Count:", count);
@@ -113,84 +147,114 @@ export default function Notifications() {
     }
 
     // 2. Navegar si es relevante (ej. a detalles de reserva)
-    if (item.type === 'booking_confirmed' && item.related_entity_id) {
+    // Ajustar según los tipos de notificaciones y las rutas de tu app
+    if ((item.type === 'booking_confirmed' || item.type === 'booking_cancelled' || item.type === 'rating_reminder') && item.related_entity_id) {
+      console.log(`Navigating to booking-detail with ID: ${item.related_entity_id}`);
       router.push({
-        pathname: '/booking-detail', // Asegúrate que esta ruta exista y reciba bookingId
+        pathname: '/booking-detail', // Ruta a los detalles de la reserva
         params: { bookingId: item.related_entity_id },
       });
+    } else if (item.type === 'new_booking_request') {
+       // Quizás navegar a la lista de servicios pendientes si eres limpiador?
+       // router.push('/pending-services'); // Ejemplo
+       console.log('Navigation for new_booking_request not implemented yet.');
     } else {
-      // Podrías manejar otros tipos de notificaciones aquí
-      // o simplemente no hacer nada si no hay acción asociada
-      console.log('No specific navigation action for this notification type.');
+      // Otros tipos o casos sin navegación específica
+      console.log('No specific navigation action for this notification type or missing related ID.');
     }
   };
 
   // Función para eliminar notificación
   const handleDeleteNotification = async (notificationId) => {
-    try {
-      const { error } = await supabase
-        .from('notifications')
-        .delete()
-        .eq('id', notificationId);
-
-      if (error) {
-        console.error("Error deleting notification:", error);
-        throw error;
-      }
-
-      // Optimistic UI update: Remove immediately
-      setNotifications((prevNotifications) =>
-        prevNotifications.filter((notification) => notification.id !== notificationId)
-      );
-      Toast.show({ type: 'success', text1: 'Notificación eliminada' });
-
-    } catch (error) {
-      Toast.show({
-        type: 'error',
-        text1: 'Error al eliminar',
-        text2: error instanceof Error ? error.message : 'No se pudo eliminar la notificación.'
-      });
-      // Podrías revertir la UI si la eliminación falla, pero es más complejo
-    }
+    // Añadir confirmación
+    Alert.alert(
+      "Eliminar Notificación",
+      "¿Estás seguro de que quieres eliminar esta notificación?",
+      [
+        { text: "Cancelar", style: "cancel" },
+        { 
+          text: "Eliminar", 
+          style: "destructive", 
+          onPress: async () => {
+            // Optimistic UI update: Remove immediately from state
+            const originalNotifications = [...notifications]; // Guardar estado original por si falla
+            setNotifications((prevNotifications) =>
+              prevNotifications.filter((notification) => notification.id !== notificationId)
+            );
+            
+            try {
+              const { error } = await supabase
+                .from('notifications')
+                .delete()
+                .eq('id', notificationId);
+        
+              if (error) {
+                console.error("Error deleting notification:", error);
+                throw error; // Lanzar para el catch
+              }
+        
+              Toast.show({ type: 'success', text1: 'Notificación eliminada' });
+        
+            } catch (error) {
+               // Revertir UI si falla
+               setNotifications(originalNotifications); 
+               Toast.show({
+                type: 'error',
+                text1: 'Error al eliminar',
+                text2: error instanceof Error ? error.message : 'No se pudo eliminar la notificación.'
+              });
+            }
+          } 
+        }
+      ]
+    );
   };
 
   // Renderizado de la acción de deslizamiento (botón Eliminar)
   const renderRightActions = (progress, dragX, item) => {
-    const trans = dragX.interpolate({
-      inputRange: [-80, 0],
-      outputRange: [0, 80], // Ajusta cuánto se revela el botón
-      extrapolate: 'clamp',
-    });
+    // No necesita progress ni dragX si usamos onPress directo
     return (
       <TouchableOpacity
         style={styles.deleteButton}
-        onPress={() => handleDeleteNotification(item.id)}
+        onPress={() => handleDeleteNotification(item.id)} // Llamar a la función con confirmación
       >
-        <Trash2 size={24} color={theme.colors.onError} />
+        <Trash2 size={20} color={theme.colors.onError} />
         <Text style={styles.deleteButtonText}>Eliminar</Text>
       </TouchableOpacity>
     );
   };
 
-  // Renderizado de cada item de notificación (ahora clickeable)
-  const renderNotificationItem = ({ item }) => (
-    <Swipeable
-      renderRightActions={(progress, dragX) => renderRightActions(progress, dragX, item)}
-      overshootRight={false}
-    >
-      <TouchableOpacity 
-        style={[styles.notificationItem, !item.is_read && styles.unreadItem]} 
-        activeOpacity={0.6} // Feedback visual al tocar
-        onPress={() => handleNotificationPress(item)} // Llamar a la nueva función
+  // Renderizado de cada item de notificación (ahora clickeable y con formato)
+  const renderNotificationItem = ({ item }) => {
+    const { title, message, Icon } = formatNotification(item); // Obtener título, mensaje e icono formateados
+
+    return (
+      <Swipeable
+        renderRightActions={(progress, dragX) => renderRightActions(progress, dragX, item)}
+        overshootRight={false}
       >
-        <Text style={styles.notificationType}>{item.type.replace('_', ' ').toUpperCase()}</Text>
-        <Text style={styles.notificationMessage}>{item.message}</Text>
-        <Text style={styles.notificationDate}>
-          {new Date(item.created_at).toLocaleDateString()} {new Date(item.created_at).toLocaleTimeString()}
-        </Text>
-      </TouchableOpacity>
-    </Swipeable>
-  );
+        <TouchableOpacity 
+          style={[styles.notificationItem, !item.is_read && styles.unreadItem]} 
+          activeOpacity={0.7} // Aumentar un poco la opacidad
+          onPress={() => handleNotificationPress(item)} // Llamar a la nueva función
+        >
+          <View style={styles.notificationContent}>
+             <View style={styles.iconContainer}>
+                <Icon size={24} color={!item.is_read ? theme.colors.primary : theme.colors.text.secondary} />
+             </View>
+             <View style={styles.textContainer}>
+                <Text style={[styles.notificationTitle, !item.is_read && styles.unreadText]}>{title}</Text>
+                <Text style={styles.notificationMessage}>{message}</Text> 
+                <Text style={styles.notificationDate}>
+                  {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - {new Date(item.created_at).toLocaleDateString()}
+                </Text>
+             </View>
+             {!item.is_read && <View style={styles.unreadDot} />} 
+          </View>
+        </TouchableOpacity>
+      </Swipeable>
+    );
+  };
 
   // Renderizado principal
   return (
@@ -238,7 +302,7 @@ export default function Notifications() {
   );
 }
 
-// --- Estilos (Adaptados de otros componentes y mejorados) ---
+// --- Estilos (Ajustes y adiciones) ---
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -277,43 +341,70 @@ const styles = StyleSheet.create({
   },
   notificationItem: {
     backgroundColor: theme.colors.surface,
-    paddingVertical: theme.spacing.lg,
-    paddingHorizontal: theme.spacing.xl,
+    // paddingVertical: theme.spacing.lg, // Controlado por notificationContent
+    // paddingHorizontal: theme.spacing.xl,
   },
   unreadItem: {
-    backgroundColor: '#f0f8ff', // Un color de fondo ligeramente diferente para no leídas
+    // Ya no se necesita fondo distinto, usamos otros indicadores
   },
-  notificationType: {
-    ...theme.typography.caption,
-    color: theme.colors.primary,
-    fontWeight: 'bold',
+  notificationContent: {
+      flexDirection: 'row',
+      paddingVertical: theme.spacing.md,
+      paddingHorizontal: theme.spacing.lg,
+      alignItems: 'center', // Centrar verticalmente icono y texto
+  },
+  iconContainer: {
+      marginRight: theme.spacing.lg,
+      // backgroundColor: theme.colors.border, // Opcional: fondo para icono
+      // padding: theme.spacing.sm,
+      // borderRadius: 20,
+  },
+  textContainer: {
+      flex: 1, // Ocupar espacio restante
+  },
+  notificationTitle: {
+    ...theme.typography.bodyStrong, // Un poco más fuerte
+    color: theme.colors.text.primary,
     marginBottom: theme.spacing.xs,
+  },
+  unreadText: {
+     fontWeight: 'bold', // Hacer título no leído más bold
+     color: theme.colors.primary, // O un color que destaque
   },
   notificationMessage: {
     ...theme.typography.body,
-    color: theme.colors.text.primary,
+    color: theme.colors.text.secondary, // Mensaje principal un poco más suave
     marginBottom: theme.spacing.sm,
   },
   notificationDate: {
     ...theme.typography.caption,
-    color: theme.colors.text.secondary,
+    color: theme.colors.text.tertiary, // Fecha más tenue
+  },
+  unreadDot: {
+      width: 10,
+      height: 10,
+      borderRadius: 5,
+      backgroundColor: theme.colors.primary,
+      marginLeft: theme.spacing.md, // Espacio a la derecha
   },
   separator: {
     height: 1,
     backgroundColor: theme.colors.border,
-    // marginLeft: theme.spacing.xl, // Opcional: indentar el separador
+    marginLeft: theme.spacing.lg + 24 + theme.spacing.lg, // Alinear con inicio del texto (aprox)
   },
   deleteButton: {
     backgroundColor: theme.colors.error,
     justifyContent: 'center',
     alignItems: 'center',
-    width: 100, // Ancho del botón de eliminar
-    flexDirection: 'row', // Para poner icono y texto juntos
+    width: 90, // Ancho del botón de eliminar
+    flexDirection: 'column', // Icono arriba, texto abajo
+    paddingVertical: theme.spacing.sm, // Espacio vertical
     gap: theme.spacing.xs,
   },
   deleteButtonText: {
     color: theme.colors.onError,
-    ...theme.typography.button,
+    ...theme.typography.caption, // Texto más pequeño
     fontWeight: 'bold',
   },
+  // Otros estilos que puedas tener...
 });

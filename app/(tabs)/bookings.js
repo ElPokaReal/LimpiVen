@@ -154,7 +154,15 @@ export default function BookingsScreen() {
                     const serviceName = booking.services?.name || 'Servicio Desconocido';
                     
                     return (
-                        <TouchableOpacity key={booking.id} style={styles.bookingCard} activeOpacity={0.7}>
+                        <TouchableOpacity 
+                            key={booking.id} 
+                            style={styles.bookingCard} 
+                            activeOpacity={0.7}
+                            onPress={() => router.push({ // Añadir onPress para navegar
+                                pathname: '/booking-detail',
+                                params: { bookingId: booking.id }
+                            })}
+                        >
                         <View style={styles.bookingHeader}>
                             <Text style={styles.bookingType}>{serviceName}</Text>
                             <View style={[styles.statusBadgeBase, statusInfo.badge]}>

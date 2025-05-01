@@ -1,13 +1,18 @@
 {
   "expo": {
-    "name": "bolt-expo-nativewind",
-    "slug": "bolt-expo-nativewind",
+    "name": "limpiven",
+    "slug": "limpiven",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "myapp",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    "splash":{
+      "image": "./assets/images/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
     "ios": {
       "supportsTablet": true
     },
@@ -17,7 +22,19 @@
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
-      "expo-router"
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#FFFFFF",
+          "image": "./assets/icon.png",
+          "dark": {
+            "image": "./assets/icon.png",
+            "backgroundColor": "#0c0a09"
+          },
+          "imageWidth": 200
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
@@ -27,7 +44,7 @@
         "origin": false
       },
       "eas": {
-        "projectId": "4cf46a3d-b937-45f1-acfc-94fc6ce24da3"
+        "projectId": "3411d866-fc8d-4dc1-9fda-11b45c501d84"
       }
     },
     "owner": "jaxor",
