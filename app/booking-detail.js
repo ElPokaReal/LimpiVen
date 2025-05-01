@@ -10,7 +10,6 @@ import RatingModal from './components/RatingModal';
 export default function BookingDetailScreen() {
   const router = useRouter();
   const { bookingId } = useLocalSearchParams(); // Obtener el ID de los parámetros de ruta
-  console.log('[BookingDetailScreen] Rendering - Received bookingId:', bookingId);
   const [booking, setBooking] = useState(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false); // Para botones Aceptar/Rechazar
@@ -19,13 +18,12 @@ export default function BookingDetailScreen() {
 
   // --- Función para cargar detalles --- 
   const fetchBookingDetails = useCallback(async () => {
-    // if (!bookingId) { // Comprobación movida al useEffect
-    //   Toast.show({ type: 'error', text1: 'Error', text2: 'ID de reserva no encontrado.' });
-    //   router.back();
-    //   return;
-    // }
+    if (!bookingId) {
+      Toast.show({ type: 'error', text1: 'Error', text2: 'ID de reserva no encontrado.' });
+      router.back();
+      return;
+    }
     setLoading(true);
-    console.log(`[BookingDetailScreen] fetchBookingDetails - Attempting to fetch ID: ${bookingId}`);
     try {
       const { data, error } = await supabase
         .from('bookings')
@@ -51,7 +49,6 @@ export default function BookingDetailScreen() {
         .single(); // Esperamos solo un resultado
 
       if (error) {
-          console.error('[BookingDetailScreen] fetchBookingDetails - Supabase Error:', error);
           if (error.code === 'PGRST116') { // Código para "0 rows returned"
                Toast.show({ type: 'error', text1: 'No Encontrado', text2: 'La reserva solicitada no existe.' });
           } else if (error.message.includes("security policy")) {
@@ -61,13 +58,11 @@ export default function BookingDetailScreen() {
           }
            router.back(); // Volver si hay error
       } else {
-        console.log('[BookingDetailScreen] fetchBookingDetails - Data fetched:', data);
         console.log('Booking details:', data);
         setBooking(data);
       }
 
     } catch (error) {
-      console.error("[BookingDetailScreen] fetchBookingDetails - Caught Error:", error);
       console.error("Error fetching booking details:", error);
       Toast.show({
         type: 'error',
@@ -102,16 +97,8 @@ export default function BookingDetailScreen() {
 
   // --- Carga inicial --- 
   useEffect(() => {
-    console.log('[BookingDetailScreen] useEffect - Checking bookingId for fetch:', bookingId);
-    if (bookingId) { // Solo llamar si tenemos bookingId
-       console.log('[BookingDetailScreen] useEffect - Calling fetchBookingDetails');
-       fetchBookingDetails();
-    } else {
-       console.error('[BookingDetailScreen] useEffect - No bookingId found!');
-       Toast.show({type: 'error', text1: 'Error', text2: 'ID de reserva no proporcionado.'});
-       if(router.canGoBack()) router.back(); // Vuelve si no hay ID y se puede volver
-    }
-  }, [fetchBookingDetails, bookingId]);
+    fetchBookingDetails();
+  }, [fetchBookingDetails]);
 
   // --- Funciones para Aceptar / Rechazar ---
   const handleUpdateStatus = async (newStatus) => {
@@ -311,6 +298,7 @@ export default function BookingDetailScreen() {
                   // TODO: Navegar al perfil del limpiador
                   console.log("Navegar al perfil de:", booking.cleaner.id);
                   router.push({ pathname: '/cleaner-profile', params: { cleanerId: booking.cleaner.id } });
+                  // Toast.show({ type: 'info', text1: 'Próximamente', text2: 'Perfil del limpiador estará disponible pronto.'});
                 }}
               >
                  {/* Podríamos añadir un icono o avatar aquí si tenemos booking.cleaner.avatar_url */}
@@ -532,6 +520,11 @@ const styles = StyleSheet.create({
   rejectButtonText: {
     color: theme.colors.error,
   },
+  // Añadir estilo para el texto del enlace
+  linkText: {
+    color: theme.colors.primary, 
+    textDecorationLine: 'underline',
+  },
   rateButtonContainer: {
       padding: theme.spacing.lg,
       borderTopWidth: 1,
@@ -552,10 +545,5 @@ const styles = StyleSheet.create({
       ...theme.typography.button,
       color: theme.colors.white,
       fontWeight: 'bold',
-  },
-  // Añadir estilo para el texto del enlace
-  linkText: {
-    color: theme.colors.primary, 
-    textDecorationLine: 'underline',
   },
 }); 

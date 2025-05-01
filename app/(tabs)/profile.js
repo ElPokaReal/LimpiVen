@@ -37,8 +37,6 @@ export default function Profile() {
     } catch (error) {
         console.error("Error loading initial data from AsyncStorage:", error);
     } finally {
-        // Podríamos iniciar un refresh aquí si queremos datos frescos siempre
-        // await fetchData();
     }
   }, [fadeAnim]);
 
@@ -51,9 +49,6 @@ export default function Profile() {
       
       if (!authUser) {
           console.warn('No authenticated user found during fetch.');
-          // Podríamos intentar limpiar AsyncStorage aquí o redirigir
-          // await AsyncStorage.clear();
-          // router.replace('/(auth)/login');
           return;
       }
 
@@ -77,7 +72,6 @@ export default function Profile() {
         await AsyncStorage.setItem('avatar_url', userDataDB.avatar_url || '');
       } else {
           console.warn('User data not found in DB for authenticated user:', authUser.id);
-          // Quizás crear perfil si no existe?
       }
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -185,23 +179,24 @@ export default function Profile() {
         </View>
 
         <View style={styles.menu}>
-          <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/edit-profile')}>
-            <User size={20} color={theme.colors.primary} />
-            <Text style={styles.menuText}>Editar Perfil</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/(tabs)/history')}>
-            <Clock size={20} color={theme.colors.primary} />
-            <Text style={styles.menuText}>Historial de Servicios</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/settings')}>
-            <Settings size={20} color={theme.colors.primary} />
-            <Text style={styles.menuText}>Ajustes</Text>
-          </TouchableOpacity>
+           <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/edit-profile')}>
+             <User size={20} color={theme.colors.primary} />
+             <Text style={styles.menuText}>Editar Perfil</Text>
+           </TouchableOpacity>
+ 
+           <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/(tabs)/history')}> 
+             <Clock size={20} color={theme.colors.primary} />
+             <Text style={styles.menuText}>Historial de Servicios</Text>
+           </TouchableOpacity>
+ 
+           <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/settings')}>
+             <Settings size={20} color={theme.colors.primary} />
+             <Text style={styles.menuText}>Ajustes</Text>
+           </TouchableOpacity>
         </View>
+
       </ScrollView>
-      <View style={styles.logoutContainer}>
+       <View style={styles.logoutContainer}>
           <TouchableOpacity style={styles.logoutButton} onPress={handleLogout} disabled={loadingLogout}>
              <LogOut size={20} color={theme.colors.error} />
              <Text style={styles.logoutText}>Cerrar Sesión</Text>

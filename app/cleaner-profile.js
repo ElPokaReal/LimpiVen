@@ -52,7 +52,7 @@ export default function CleanerProfileScreen() {
       // 1. Obtener información del limpiador (nombre Y AVATAR)
       const { data: cleanerData, error: cleanerError } = await supabase
         .from('users')
-        .select('full_name, avatar_url') // <--- Seleccionar también avatar_url
+        .select('full_name, avatar_url')
         .eq('id', cleanerId)
         .single();
 
@@ -77,7 +77,7 @@ export default function CleanerProfileScreen() {
         const totalRating = reviewsData.reduce((sum, review) => sum + review.rating, 0);
         setAverageRating(totalRating / reviewsData.length);
       } else {
-        setAverageRating(0); // O null si prefieres indicar que no hay reseñas
+        setAverageRating(0);
       }
 
     } catch (err) {
@@ -165,7 +165,7 @@ export default function CleanerProfileScreen() {
                       <Text style={styles.reviewComment}>{review.comment || 'Sin comentarios'}</Text>
                    </View>
                    {/* Opcional: Mostrar nombre del cliente */} 
-                   <Text style={styles.clientName}>De: {review.client?.full_name || 'Cliente Anónimo'}</Text>
+                   {/* <Text style={styles.clientName}>De: {review.client?.full_name || 'Cliente Anónimo'}</Text> */} 
                 </View>
               ))
             ) : (
@@ -312,4 +312,4 @@ const styles = StyleSheet.create({
      marginTop: theme.spacing.xs,
      textAlign: 'right',
    }
-}); 
+});

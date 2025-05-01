@@ -71,7 +71,7 @@ export default function EmployeeProfile() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Mi Perfil (Empleado)</Text>
+      <Text style={styles.title}>Mi Perfil</Text>
 
       <View style={styles.reputationContainer}>
         <Star size={24} color={theme.colors.warning} />
@@ -86,6 +86,9 @@ export default function EmployeeProfile() {
           </Text>
         )}
       </View>
+
+      {/* Aquí se mostrará y editará el perfil del empleado */}
+      {/* TODO: Añadir campos editables (nombre, etc.) */}
 
       <TouchableOpacity 
         style={[styles.logoutButton, loading && styles.buttonDisabled]} 
@@ -118,7 +121,7 @@ const styles = StyleSheet.create({
   title: {
     ...theme.typography.h1,
     color: theme.colors.text.primary,
-    marginBottom: theme.spacing.xl,
+    marginBottom: theme.spacing.lg,
   },
   reputationContainer: {
     flexDirection: 'row',

@@ -189,6 +189,12 @@ function RootLayoutNav() {
   return (
       <Stack screenOptions={{ headerShown: false }}>
          <Stack.Screen name="principal" />
+         {/*
+            Expo Router maneja los grupos automáticamente basado en directorios.
+            No necesitamos declarar explícitamente (auth), (tabs), (employee) aquí 
+            a menos que queramos configuraciones específicas para ellos en ESTE Stack.
+            Eliminarlos puede resolver el warning "No route named ... exists in nested children".
+         */}
          {/* <Stack.Screen name="(auth)" /> */}
          {/* <Stack.Screen name="(tabs)" /> */}
          {/* <Stack.Screen name="(employee)" /> */}
