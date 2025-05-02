@@ -249,8 +249,8 @@ export default function BookingDetailScreen() {
 
   const statusStyle = getStatusStyle(booking.status);
   const hasBeenReviewed = booking.reviews && booking.reviews.length > 0 && booking.reviews[0].count > 0;
-  const canReview = currentUserRole === 'client' && booking.status === 'completado' && !hasBeenReviewed;
-  const showActionButtons = currentUserRole === 'cleaner' && booking.status === 'pendiente' && !booking.cleaner_id;
+  const canReview = currentUserRole === 'cliente' && booking.status === 'completado' && !hasBeenReviewed;
+  const showActionButtons = currentUserRole === 'limpiador' && booking.status === 'pendiente' && !booking.cleaner_id;
 
   return (
     <View style={styles.container}>
@@ -314,7 +314,7 @@ export default function BookingDetailScreen() {
           </View>
         )}
 
-        {currentUserRole === 'cleaner' && booking.client && (
+        {currentUserRole === 'limpiador' && booking.client && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Información del Cliente</Text>
             <View style={styles.infoRow}>
@@ -330,7 +330,7 @@ export default function BookingDetailScreen() {
           </View>
         )}
 
-        {currentUserRole === 'client' && booking.cleaner && (
+        {currentUserRole === 'cliente' && booking.cleaner && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Limpiador Asignado</Text>
             <View style={styles.infoRow}>
