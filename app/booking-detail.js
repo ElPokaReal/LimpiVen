@@ -2,19 +2,22 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert, Platform, Modal } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { supabase } from '../lib/supabase';
-import { theme } from './theme';
+import { useTheme } from '../constants/ThemeContext';
 import Toast from 'react-native-toast-message';
 import { ArrowLeft, Calendar, Clock, MapPin, User, FileText, CheckCircle, XCircle, Star } from 'lucide-react-native';
 import RatingModal from './components/RatingModal';
 
 export default function BookingDetailScreen() {
   const router = useRouter();
-  const { bookingId } = useLocalSearchParams(); // Obtener el ID de los parámetros de ruta
+  const { bookingId } = useLocalSearchParams();
+  const { theme } = useTheme();
+  const styles = getStyles(theme);
+
   const [booking, setBooking] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [actionLoading, setActionLoading] = useState(false); // Para botones Aceptar/Rechazar
+  const [actionLoading, setActionLoading] = useState(false);
   const [isRatingModalVisible, setIsRatingModalVisible] = useState(false);
-  const [currentUserRole, setCurrentUserRole] = useState(null); // Para saber si es cliente o limpiador
+  const [currentUserRole, setCurrentUserRole] = useState(null);
 
   // --- Función para cargar detalles --- 
   const fetchBookingDetails = useCallback(async () => {
@@ -46,17 +49,17 @@ export default function BookingDetailScreen() {
           reviews ( count )
         `)
         .eq('id', bookingId)
-        .single(); // Esperamos solo un resultado
+        .single();
 
       if (error) {
-          if (error.code === 'PGRST116') { // Código para "0 rows returned"
+          if (error.code === 'PGRST116') {
                Toast.show({ type: 'error', text1: 'No Encontrado', text2: 'La reserva solicitada no existe.' });
           } else if (error.message.includes("security policy")) {
                 Toast.show({ type: 'error', text1: 'Acceso Denegado', text2: 'No tienes permiso para ver esta reserva.' });
           } else {
               throw error;
           }
-           router.back(); // Volver si hay error
+           router.back();
       } else {
         console.log('Booking details:', data);
         setBooking(data);
@@ -69,18 +72,16 @@ export default function BookingDetailScreen() {
         text1: 'Error cargando detalles',
         text2: error instanceof Error ? error.message : 'Ocurrió un error'
       });
-      router.back(); // Volver si hay error genérico
+      router.back();
     } finally {
       setLoading(false);
     }
   }, [bookingId, router]);
 
-  // --- Determinar rol del usuario --- (Hacerlo una sola vez)
+  // --- Determinar rol del usuario ---
   useEffect(() => {
     const getUserRole = async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      // Asumiendo que tienes una tabla 'users' o un campo en 'auth.users.raw_user_meta_data' con el rol
-      // Ajusta esta parte según cómo almacenes el rol
       if (user) {
         const { data: userData, error: userError } = await supabase
           .from('users') 
@@ -95,7 +96,7 @@ export default function BookingDetailScreen() {
     getUserRole();
   }, []);
 
-  // --- Carga inicial --- 
+  // --- Carga inicial ---
   useEffect(() => {
     fetchBookingDetails();
   }, [fetchBookingDetails]);
@@ -104,7 +105,6 @@ export default function BookingDetailScreen() {
   const handleUpdateStatus = async (newStatus) => {
     setActionLoading(true);
     try {
-      // Necesitamos el ID del limpiador actual para asignarlo si acepta
       const { data: { user }, error: userError } = await supabase.auth.getUser();
       if (userError || !user) {
           Toast.show({ type: 'error', text1: 'Error', text2: 'No se pudo verificar tu sesión.' });
@@ -113,28 +113,19 @@ export default function BookingDetailScreen() {
       }
       const currentCleanerId = user.id;
 
-      // Crear objeto de actualización
       let updateData = { status: newStatus };
       if (newStatus === 'confirmado') {
-          // Si se acepta, asignar el cleaner_id del usuario actual
           updateData.cleaner_id = currentCleanerId; 
       }
-      // Si se rechaza (newStatus = 'cancelado'), no cambiamos el cleaner_id (sigue null)
 
-      // DEBUG LOGS
       console.log('[handleUpdateStatus] Intentando actualizar booking ID:', bookingId);
       console.log('[handleUpdateStatus] Datos de actualización:', JSON.stringify(updateData));
       console.log('[handleUpdateStatus] ID del limpiador actual:', currentCleanerId);
 
       const { error } = await supabase
         .from('bookings')
-        .update(updateData) // <- Usar el objeto de actualización
-        .eq('id', bookingId)
-        // Opcional: Podríamos añadir una condición extra para evitar race conditions
-        // asegurándonos que la reserva sigue pendiente y sin asignar antes de actualizarla.
-        // .eq('status', 'pendiente') 
-        // .is('cleaner_id', null) 
-        ;
+        .update(updateData)
+        .eq('id', bookingId);
 
       if (error) {
         if (error.message.includes("security policy")) {
@@ -146,12 +137,9 @@ export default function BookingDetailScreen() {
         Toast.show({ 
             type: 'success', 
             text1: 'Éxito', 
-            text2: `Reserva ${newStatus === 'confirmado' ? 'aceptada y asignada' : 'rechazada'} correctamente.` // Mensaje ajustado
+            text2: `Reserva ${newStatus === 'confirmado' ? 'aceptada y asignada' : 'rechazada'} correctamente.`
         });
-        // Actualizar estado local para reflejar cambio inmediato (incluyendo cleaner_id si se aceptó)
         setBooking(prev => prev ? { ...prev, ...updateData } : null);
-        // Deshabilitar botones ya que la acción se completó (showActionButtons se volverá false)
-        // router.back(); // Podrías navegar atrás automáticamente si quieres
       }
     } catch (error) {
        console.error(`Error updating booking status to ${newStatus}:`, error);
@@ -176,14 +164,14 @@ export default function BookingDetailScreen() {
          return;
      }
 
-    setActionLoading(true); // Reusar estado de carga o crear uno nuevo
+    setActionLoading(true);
     try {
       const { error } = await supabase
         .from('reviews')
         .insert({
           booking_id: booking.id,
-          client_id: booking.client_id, // El cliente de la reserva
-          cleaner_id: booking.cleaner_id, // El limpiador de la reserva
+          client_id: booking.client_id,
+          cleaner_id: booking.cleaner_id,
           rating: rating,
           comment: comment || null
         });
@@ -191,8 +179,7 @@ export default function BookingDetailScreen() {
       if (error) throw error;
 
       Toast.show({ type: 'success', text1: 'Reseña Enviada', text2: '¡Gracias por tu calificación!' });
-      setIsRatingModalVisible(false); // Cerrar modal
-      // Refrescar datos para que el botón desaparezca (o actualizar estado local)
+      setIsRatingModalVisible(false);
       fetchBookingDetails(); 
 
     } catch (error) {
@@ -209,7 +196,7 @@ export default function BookingDetailScreen() {
       const message = actionType === 'accept' 
           ? '¿Estás seguro de que quieres aceptar este servicio?' 
           : '¿Estás seguro de que quieres rechazar este servicio?';
-      const newStatus = actionType === 'accept' ? 'confirmado' : 'cancelado'; // O 'rechazado' si prefieres
+      const newStatus = actionType === 'accept' ? 'confirmado' : 'cancelado';
 
       Alert.alert(
           title,
@@ -223,7 +210,7 @@ export default function BookingDetailScreen() {
       );
   };
 
-  // --- Formateo de Fecha/Hora --- (similar a otras pantallas)
+  // --- Formateo de Fecha/Hora/Frecuencia ---
    const formatDateTime = (isoString) => {
     if (!isoString) return '-';
     try {
@@ -240,310 +227,341 @@ export default function BookingDetailScreen() {
        return map[freq] || freq || 'No especificada';
    }
 
+   // --- Helper para obtener el color y texto del status ---
+   const getStatusStyle = (status) => {
+    switch (status) {
+      case 'pendiente': return { color: theme.colors.warning, text: 'Pendiente' };
+      case 'confirmado': return { color: theme.colors.primary, text: 'Confirmado' };
+      case 'completado': return { color: theme.colors.success, text: 'Completado' };
+      case 'cancelado': return { color: theme.colors.error, text: 'Cancelado' };
+      default: return { color: theme.colors.text.secondary, text: status };
+    }
+  };
+
   // --- Renderizado --- 
   if (loading) {
     return <View style={styles.centered}><ActivityIndicator size="large" color={theme.colors.primary} /></View>;
   }
 
   if (!booking) {
-    // Mensaje de error ya mostrado por fetchBookingDetails, pantalla vacía o puedes poner otro mensaje.
     return <View style={styles.container}><Text style={styles.errorText}>No se pudo cargar la reserva.</Text></View>;
   }
 
-  // Solo mostrar botones si el estado es 'pendiente'
-  const showActionButtons = currentUserRole === 'limpiador' && booking.status === 'pendiente';
-
-  // Mostrar botón de calificar si el usuario es cliente, el estado es 'completado' y no hay reseñas
-  const showRateButton = currentUserRole === 'cliente' && booking.status === 'completado' && booking.reviews?.[0]?.count === 0;
+  const statusStyle = getStatusStyle(booking.status);
+  const hasBeenReviewed = booking.reviews && booking.reviews.length > 0 && booking.reviews[0].count > 0;
+  const canReview = currentUserRole === 'client' && booking.status === 'completado' && !hasBeenReviewed;
+  const showActionButtons = currentUserRole === 'cleaner' && booking.status === 'pendiente' && !booking.cleaner_id;
 
   return (
-    <View style={styles.outerContainer}>
-       <View style={styles.header}>
+    <View style={styles.container}>
+      <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <ArrowLeft size={24} color={theme.colors.text.primary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Detalles del Servicio</Text>
+        <Text style={styles.headerTitle}>Detalles de la Reserva</Text>
+         <View style={styles.headerPlaceholder} />
       </View>
-      
-      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-          {/* Detalles del Servicio */}          
-          <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Servicio Solicitado</Text>
-              <Text style={styles.detailValue}>{booking.service?.name || 'N/A'}</Text>
-              <Text style={styles.detailLabel}>Precio Base: ${booking.service?.base_price || 'N/A'}</Text>
-              <Text style={styles.detailLabel}>Duración Estimada: {booking.service?.duration_minutes || 'N/A'} min</Text>
+
+      <ScrollView contentContainerStyle={styles.content}>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Servicio Solicitado</Text>
+          <View style={styles.infoRow}>
+            <FileText size={20} color={theme.colors.text.secondary} />
+            <Text style={styles.infoText}>{booking.service?.name || '-'}</Text>
           </View>
-
-          {/* Detalles del Cliente */}          
-          <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Información del Cliente</Text>
-              <View style={styles.detailRow}>
-                <User size={18} color={theme.colors.text.secondary}/>
-                <Text style={styles.detailValue}>{booking.client?.full_name || 'N/A'}</Text>
-              </View>
-              {/* Podrías añadir el teléfono si tienes permisos para verlo */}
-              {/* <View style={styles.detailRow}>
-                 <Phone size={18} color={theme.colors.text.secondary}/> 
-                 <Text style={styles.detailValue}>{booking.client?.phone_number || 'N/A'}</Text>
-              </View> */} 
+          <View style={styles.infoRow}>
+             <Text style={[styles.label, { width: 80 }]}>Estado:</Text>
+             <Text style={[styles.infoText, { color: statusStyle.color, fontWeight: 'bold' }]}>{statusStyle.text}</Text>
           </View>
-
-          {/* --- Información del Limpiador (si está asignado) --- */}
-          {booking.cleaner && (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Asignado a</Text>
-              <TouchableOpacity 
-                style={styles.detailRow} 
-                onPress={() => {
-                  // TODO: Navegar al perfil del limpiador
-                  console.log("Navegar al perfil de:", booking.cleaner.id);
-                  router.push({ pathname: '/cleaner-profile', params: { cleanerId: booking.cleaner.id } });
-                  // Toast.show({ type: 'info', text1: 'Próximamente', text2: 'Perfil del limpiador estará disponible pronto.'});
-                }}
-              >
-                 {/* Podríamos añadir un icono o avatar aquí si tenemos booking.cleaner.avatar_url */}
-                 <User size={18} color={theme.colors.text.secondary}/> 
-                 <Text style={[styles.detailValue, styles.linkText]}>{booking.cleaner.full_name}</Text>
-                 {/* Añadir un pequeño icono de flecha o similar podría ser útil */}
-              </TouchableOpacity>
-            </View>
-          )}
-
-          {/* Fecha y Hora */}          
-          <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Fecha y Hora Programada</Text>
-              <View style={styles.detailRow}>
-                 <Calendar size={18} color={theme.colors.text.secondary}/>
-                 <Text style={styles.detailValue}>{formatDateTime(booking.scheduled_date)}</Text>
-              </View>
-              <View style={styles.detailRow}>
-                 <Clock size={18} color={theme.colors.text.secondary}/>
-                 <Text style={styles.detailLabel}>Frecuencia: {formatFrequency(booking.frequency)}</Text>
-              </View>
+          <View style={styles.infoRow}>
+            <Text style={[styles.label, { width: 80 }]}>Frecuencia:</Text>
+            <Text style={styles.infoText}>{formatFrequency(booking.frequency)}</Text>
           </View>
-
-          {/* Dirección */}          
-          <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Dirección</Text>
-               <View style={styles.detailRow}>
-                 <MapPin size={18} color={theme.colors.text.secondary}/>
-                 <Text style={styles.detailValue}>{ 
-                    booking.location
-                    ? `${booking.location.address_line1}${booking.location.address_line2 ? ', '+booking.location.address_line2 : ''}${booking.location.nickname ? ` (${booking.location.nickname})`: ''}` 
-                    : 'No especificada'
-                 }</Text>
-              </View>
+          <View style={styles.infoRow}>
+             <Text style={[styles.label, { width: 80 }]}>Precio:</Text>
+             <Text style={styles.infoText}>{booking.service?.base_price ? `$${booking.service.base_price.toFixed(2)}` : '-'}</Text>
           </View>
-
-           {/* Instrucciones */}          
           {booking.special_instructions && (
-             <View style={styles.section}>
-                  <Text style={styles.sectionTitle}>Instrucciones Especiales</Text>
-                  <View style={styles.detailRow}>
-                    <FileText size={18} color={theme.colors.text.secondary}/>
-                    <Text style={styles.detailValue}>{booking.special_instructions}</Text>
-                 </View>
-              </View>
-          )}
-          
-          {/* Estado Actual (Informativo) */} 
-          <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Estado Actual</Text>
-               <Text style={[styles.detailValue, styles.statusText(booking.status)]}>{booking.status.toUpperCase()}</Text>
-          </View>
-
-          {/* Botones de Acción */}          
-          {showActionButtons && (
-            <View style={styles.actionButtonsContainer}>
-                <TouchableOpacity 
-                    style={[styles.actionButton, styles.rejectButton]} 
-                    onPress={() => confirmAction('reject')}
-                    disabled={actionLoading}
-                >
-                    {actionLoading ? <ActivityIndicator color={theme.colors.error} /> : <XCircle size={20} color={theme.colors.error} />} 
-                    <Text style={[styles.actionButtonText, styles.rejectButtonText]}>Rechazar</Text>
-                </TouchableOpacity>
-                <TouchableOpacity 
-                    style={[styles.actionButton, styles.acceptButton]} 
-                    onPress={() => confirmAction('accept')}
-                    disabled={actionLoading}
-                >
-                    {actionLoading ? <ActivityIndicator color={theme.colors.surface} /> : <CheckCircle size={20} color={theme.colors.surface} />} 
-                    <Text style={[styles.actionButtonText, styles.acceptButtonText]}>Aceptar</Text>
-                </TouchableOpacity>
+            <View style={styles.infoRowFlexStart}>
+              <Text style={styles.label}>Instrucciones:</Text>
+              <Text style={styles.infoText}>{booking.special_instructions}</Text>
             </View>
           )}
+        </View>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Fecha y Hora</Text>
+          <View style={styles.infoRow}>
+            <Calendar size={20} color={theme.colors.text.secondary} />
+            <Text style={styles.infoText}>{formatDateTime(booking.scheduled_date)}</Text>
+          </View>
+          <View style={styles.infoRow}>
+            <Clock size={20} color={theme.colors.text.secondary} />
+            <Text style={styles.infoText}>Duración estimada: {booking.service?.duration_minutes || '?'} min</Text>
+          </View>
+        </View>
 
-          {/* --- BOTÓN DE CALIFICACIÓN (Cliente) --- */}
-          {showRateButton && (
-              <View style={styles.rateButtonContainer}> 
-                 <TouchableOpacity 
-                    style={styles.rateButton} 
-                    onPress={() => setIsRatingModalVisible(true)} // Abrir modal
-                    disabled={actionLoading} // Deshabilitar si se está enviando
-                 >
-                    <Star size={20} color={theme.colors.white} /> 
-                    <Text style={styles.rateButtonText}>Calificar este Servicio</Text>
-                    {actionLoading && <ActivityIndicator color={theme.colors.white} style={{marginLeft: 10}}/>}
-                 </TouchableOpacity>
+        {booking.location && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Ubicación</Text>
+            <View style={styles.infoRow}>
+              <MapPin size={20} color={theme.colors.text.secondary} />
+              <View style={styles.locationTextContainer}>
+                {booking.location.nickname && <Text style={styles.infoTextBold}>{booking.location.nickname}</Text>}
+                <Text style={styles.infoText}>{booking.location.address_line1 || '-'}</Text>
+                {booking.location.address_line2 && <Text style={styles.infoText}>{booking.location.address_line2}</Text>}
               </View>
-          )}
+            </View>
+          </View>
+        )}
+
+        {currentUserRole === 'cleaner' && booking.client && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Información del Cliente</Text>
+            <View style={styles.infoRow}>
+              <User size={20} color={theme.colors.text.secondary} />
+              <Text style={styles.infoText}>{booking.client.full_name}</Text>
+            </View>
+             {booking.client.phone_number && (
+                <View style={styles.infoRow}>
+
+                   <Text style={styles.infoText}>Tel: {booking.client.phone_number}</Text>
+                </View>
+             )}
+          </View>
+        )}
+
+        {currentUserRole === 'client' && booking.cleaner && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Limpiador Asignado</Text>
+            <View style={styles.infoRow}>
+              <User size={20} color={theme.colors.text.secondary} />
+              <Text style={styles.infoText}>{booking.cleaner.full_name}</Text>
+            </View>
+
+             <TouchableOpacity 
+                style={styles.viewProfileButton}
+                onPress={() => router.push({ pathname: 'cleaner-profile', params: { cleanerId: booking.cleaner.id } })}
+             >
+                 <Text style={styles.viewProfileButtonText}>Ver Perfil del Limpiador</Text>
+             </TouchableOpacity>
+          </View>
+        )}
+
+        {showActionButtons && (
+          <View style={styles.actionButtonsContainer}>
+            <TouchableOpacity
+              style={[styles.button, styles.acceptButton, actionLoading && styles.buttonDisabled]}
+              onPress={() => confirmAction('accept')}
+              disabled={actionLoading}
+            >
+              {actionLoading ? (
+                <ActivityIndicator color={theme.colors.surface} />
+              ) : (
+                <>
+                  <CheckCircle size={20} color={theme.colors.surface} />
+                  <Text style={styles.buttonText}>Aceptar Servicio</Text>
+                </>
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.button, styles.rejectButton, actionLoading && styles.buttonDisabled]}
+              onPress={() => confirmAction('reject')}
+              disabled={actionLoading}
+            >
+               {actionLoading ? (
+                <ActivityIndicator color={theme.colors.error} /> // Use theme color for loader too
+              ) : (
+                 <>
+                  <XCircle size={20} color={theme.colors.error} />
+                  <Text style={styles.rejectButtonText}>Rechazar</Text>
+                 </>
+              )}
+            </TouchableOpacity>
+          </View>
+        )}
+
+
+        {canReview && (
+           <TouchableOpacity 
+             style={[styles.button, styles.reviewButton, actionLoading && styles.buttonDisabled]} 
+             onPress={() => setIsRatingModalVisible(true)}
+             disabled={actionLoading}
+           >
+             {actionLoading ? (
+                 <ActivityIndicator color={theme.colors.primary} />
+             ) : (
+                 <>
+                     <Star size={20} color={theme.colors.primary} />
+                     <Text style={styles.reviewButtonText}>Dejar Reseña</Text>
+                 </>
+             )}
+           </TouchableOpacity>
+        )}
 
       </ScrollView>
 
-      {/* --- MODAL DE CALIFICACIÓN --- */}
-      {booking && (
-          <RatingModal 
-              isVisible={isRatingModalVisible}
-              onClose={() => setIsRatingModalVisible(false)}
-              onSubmit={submitReview} // Pasar la función de envío
-              bookingServiceName={booking.service?.name || 'el servicio'} // Nombre para el título
-          />
-      )}
+
+      <RatingModal
+          visible={isRatingModalVisible}
+          onClose={() => setIsRatingModalVisible(false)}
+          onSubmit={submitReview}
+          // theme={theme} // Pasar theme si RatingModal lo requiere directamente (mejor si usa useTheme)
+      />
 
       <Toast />
     </View>
   );
 }
 
-// --- Estilos ---
-const styles = StyleSheet.create({
-  outerContainer: {
-      flex: 1,
-      backgroundColor: theme.colors.background,
-  },
+// Function to generate styles based on the theme
+const getStyles = (theme) => StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: theme.colors.background, // Use theme color
   },
-  content: {
-     padding: theme.spacing.lg,
-     paddingBottom: theme.spacing.xl * 3, // Más padding al final
-  },
-   centered: {
-      flex: 1,
-      justifyContent: 'center',
-      alignItems: 'center',
-      backgroundColor: theme.colors.background,
-   },
-   errorText: {
-       ...theme.typography.body,
-       color: theme.colors.error,
-       textAlign: 'center',
-       marginTop: 20,
-   },
-   header: { // Igual que en la pantalla de lista
-    backgroundColor: theme.colors.surface,
-    padding: theme.spacing.lg,
-    paddingTop: Platform.OS === 'android' ? theme.spacing.xl + 10 : 48, 
+  header: {
+    backgroundColor: theme.colors.surface, // Use theme color
+    paddingHorizontal: theme.spacing.lg,
+    paddingTop: Platform.OS === 'android' ? theme.spacing.xl + 10 : 48,
+    paddingBottom: theme.spacing.md,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
+    borderBottomColor: theme.colors.border, // Use theme color
+    ...theme.shadows.sm,
   },
-  backButton: { // Igual que en la pantalla de lista
+  backButton: {
     padding: theme.spacing.sm,
-    marginRight: theme.spacing.md,
   },
-  headerTitle: { // Igual que en la pantalla de lista
+  headerTitle: {
     ...theme.typography.h2,
-    color: theme.colors.text.primary,
+    color: theme.colors.text.primary, // Use theme color
+    textAlign: 'center',
+    flex: 1,
+  },
+  headerPlaceholder: {
+      width: 24 + theme.spacing.sm * 2, // Match back button size + padding
+  },
+  centered: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: theme.colors.background, // Use theme color
+  },
+  errorText: {
+    ...theme.typography.body,
+    color: theme.colors.error, // Use theme error color
+    textAlign: 'center',
+    padding: theme.spacing.lg,
+  },
+  content: {
+    padding: theme.spacing.lg,
+    paddingBottom: theme.spacing.xxl, // Extra padding at bottom
   },
   section: {
-    backgroundColor: theme.colors.surface,
-    borderRadius: theme.borderRadius.lg,
-    padding: theme.spacing.lg,
+    backgroundColor: theme.colors.surface, // Use theme color
+    borderRadius: theme.borderRadius.md,
+    padding: theme.spacing.md,
     marginBottom: theme.spacing.lg,
-    ...theme.shadows.sm,
+    borderWidth: 1,
+    borderColor: theme.colors.border, // Use theme color
+    ...theme.shadows.xs,
   },
   sectionTitle: {
     ...theme.typography.h3,
-    color: theme.colors.text.primary,
+    color: theme.colors.text.primary, // Use theme color
     marginBottom: theme.spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
+    borderBottomColor: theme.colors.border, // Use theme color
     paddingBottom: theme.spacing.sm,
   },
-  detailRow: {
+  infoRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: theme.spacing.md, // Más espacio
     marginBottom: theme.spacing.sm,
-  },
-  detailLabel: {
-    ...theme.typography.caption,
-    color: theme.colors.text.secondary,
-    marginBottom: theme.spacing.xs,
-  },
-  detailValue: {
-    ...theme.typography.body,
-    color: theme.colors.text.primary,
-    flexShrink: 1,
-  },
-   statusText: (status) => ({
-    fontWeight: 'bold',
-    color: status === 'pendiente' ? theme.colors.warning :
-           status === 'confirmado' ? theme.colors.success :
-           status === 'cancelado' ? theme.colors.error :
-           theme.colors.text.primary,
-  }),
-  actionButtonsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: theme.spacing.xl,
     gap: theme.spacing.md,
   },
-  actionButton: {
-    flex: 1, // Ocupar espacio disponible
+   infoRowFlexStart: {
+    flexDirection: 'row',
+    alignItems: 'flex-start', // Align top for multi-line text
+    marginBottom: theme.spacing.sm,
+    gap: theme.spacing.md,
+  },
+  label: {
+    ...theme.typography.label,
+    color: theme.colors.text.secondary, // Use theme color
+    // width: 80, // Consider removing fixed width or adjusting based on content
+  },
+  infoText: {
+    ...theme.typography.body1,
+    color: theme.colors.text.primary, // Use theme color
+    flex: 1, // Allow text to wrap if needed
+  },
+  infoTextBold: {
+    ...theme.typography.body1,
+    color: theme.colors.text.primary,
+    fontWeight: 'bold',
+  },
+  locationTextContainer: {
+      flex: 1, // Take remaining space
+  },
+  viewProfileButton: {
+      marginTop: theme.spacing.md,
+      paddingVertical: theme.spacing.xs,
+      alignSelf: 'flex-start', // Don't stretch full width
+  },
+  viewProfileButtonText: {
+      ...theme.typography.button,
+      color: theme.colors.primary, // Use theme color
+      fontSize: 14,
+  },
+  actionButtonsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginTop: theme.spacing.lg,
+    gap: theme.spacing.md,
+  },
+  button: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: theme.spacing.lg,
+    paddingVertical: theme.spacing.md,
+    paddingHorizontal: theme.spacing.lg,
     borderRadius: theme.borderRadius.lg,
-    ...theme.shadows.md,
     gap: theme.spacing.sm,
+    flex: 1, // Make buttons share space
+    ...theme.shadows.sm,
   },
   acceptButton: {
-    backgroundColor: theme.colors.primary,
+    backgroundColor: theme.colors.primary, // Use theme color
   },
   rejectButton: {
-    backgroundColor: theme.colors.surface, // Fondo claro para rechazar
+    backgroundColor: theme.colors.surface, // Use theme color
     borderWidth: 1,
-    borderColor: theme.colors.error, 
+    borderColor: theme.colors.error, // Use theme error color
   },
-  actionButtonText: {
+  reviewButton: {
+     backgroundColor: theme.colors.surface, // Use theme color
+     borderWidth: 1,
+     borderColor: theme.colors.primary,
+     marginTop: theme.spacing.lg,
+     flex: 0, // Don't make it flex 1
+     alignSelf: 'center',
+  },
+  buttonText: {
     ...theme.typography.button,
-    fontSize: 16, // Ligeramente más grande
-  },
-  acceptButtonText: {
-    color: theme.colors.surface,
+    color: theme.colors.surface, // Use theme color (text on primary)
   },
   rejectButtonText: {
-    color: theme.colors.error,
+     ...theme.typography.button,
+    color: theme.colors.error, // Use theme error color (text on surface for reject)
   },
-  // Añadir estilo para el texto del enlace
-  linkText: {
-    color: theme.colors.primary, 
-    textDecorationLine: 'underline',
-  },
-  rateButtonContainer: {
-      padding: theme.spacing.lg,
-      borderTopWidth: 1,
-      borderTopColor: theme.colors.border,
-      backgroundColor: theme.colors.background, // Fondo similar
-  },
-  rateButton: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: theme.colors.primary, // Color primario
-      paddingVertical: theme.spacing.lg, // Más grande
-      borderRadius: theme.borderRadius.lg,
-      gap: theme.spacing.sm,
-      ...theme.shadows.md,
-  },
-  rateButtonText: {
+  reviewButtonText: {
       ...theme.typography.button,
-      color: theme.colors.white,
-      fontWeight: 'bold',
+      color: theme.colors.primary,
+  },
+  buttonDisabled: {
+    opacity: 0.6, // Generic disabled style
   },
 }); 

@@ -2,12 +2,15 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Platform, RefreshControl, Linking, Alert } from 'react-native';
 import { Clock, MapPin, User, ChevronRight, CheckCircle, MessageCircle, PlayCircle } from 'lucide-react-native'; // Añadir icono si es necesario
 import { useRouter } from 'expo-router';
-import { theme } from './theme';
+import { useTheme } from '../constants/ThemeContext'; // Import useTheme
 import { supabase } from '../lib/supabase';
 import Toast from 'react-native-toast-message';
 
 export default function AcceptedServices() {
   const router = useRouter();
+  const { theme } = useTheme(); // Use theme hook
+  const styles = getStyles(theme); // Get styles from theme
+
   const [acceptedBookings, setAcceptedBookings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -21,7 +24,7 @@ export default function AcceptedServices() {
       const { data: { user }, error: userError } = await supabase.auth.getUser();
       if (userError || !user) {
         Toast.show({ type: 'error', text1: 'Error', text2: 'No autenticado.' });
-        router.replace('/auth'); 
+        router.replace('/(auth)/auth'); // Redirect to auth group
         return;
       }
       setEmployeeId(user.id);
@@ -199,6 +202,15 @@ export default function AcceptedServices() {
     }
   };
 
+  // --- Helper para obtener el color y texto del status ---
+  const getStatusStyle = (status) => {
+    switch (status) {
+      case 'confirmado': return { color: theme.colors.primary, text: 'Confirmado' };
+      case 'en_progreso': return { color: theme.colors.info, text: 'En Progreso' }; // Use info color
+      default: return { color: theme.colors.text.secondary, text: status };
+    }
+  };
+
   // --- Renderizado ---
   return (
     <View style={styles.outerContainer}>
@@ -208,12 +220,13 @@ export default function AcceptedServices() {
 
       <ScrollView
         style={styles.container}
+        contentContainerStyle={styles.scrollContent} // Use contentContainerStyle for padding
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            colors={[theme.colors.primary]}
-            tintColor={theme.colors.primary}
+            colors={[theme.colors.primary]} // Use theme color
+            tintColor={theme.colors.primary} // Use theme color
           />
         }
       >
@@ -222,25 +235,27 @@ export default function AcceptedServices() {
         ) : acceptedBookings.length === 0 ? (
           <View style={styles.noItemsContainer}>
             <Text style={styles.noItemsText}>No tienes servicios aceptados en este momento.</Text>
+             <Text style={styles.noItemsSubText}>Refresca para buscar nuevos servicios.</Text>
           </View>
         ) : (
           <View style={styles.list}>
-            {acceptedBookings.map((booking) => (
+            {acceptedBookings.map((booking) => {
+              const statusStyle = getStatusStyle(booking.status);
+              return (
               <TouchableOpacity 
                 key={booking.id} 
                 style={styles.card} 
-                activeOpacity={0.7}
+                activeOpacity={0.8}
                 onPress={() => handleViewDetails(booking.id)}
               >
                 <View style={styles.cardHeader}>
                    <Text style={styles.serviceName}>{booking.service?.name || 'Servicio Desconocido'}</Text> 
-                   {/* Podríamos añadir el estado aquí si queremos */}
-                   <Text style={styles.statusText}>Estado: {booking.status}</Text>
+                    <Text style={[styles.statusText, { color: statusStyle.color }]}>{statusStyle.text}</Text>
                 </View>
                 <View style={styles.cardBody}>
                    <View style={styles.detailRow}>
                     <User size={16} color={theme.colors.text.secondary} />
-                    <Text style={styles.detailText}>Cliente: {booking.client?.full_name || 'Cliente Desconocido'}</Text>
+                    <Text style={styles.detailText}>{booking.client?.full_name || 'Cliente Desconocido'}</Text>
                   </View>
                    <View style={styles.detailRow}>
                     <Clock size={16} color={theme.colors.text.secondary} />
@@ -248,200 +263,191 @@ export default function AcceptedServices() {
                   </View>
                   <View style={styles.detailRow}>
                     <MapPin size={16} color={theme.colors.text.secondary} />
-                     <Text style={styles.detailText} numberOfLines={1}>{ 
-                      booking.location
-                      ? `${booking.location.address_line1}${booking.location.address_line2 ? ', '+booking.location.address_line2 : ''}`
-                      : 'Dirección no especificada'
-                    }</Text>
+                     <Text style={styles.detailText} numberOfLines={1} ellipsizeMode="tail"> 
+                      {booking.location
+                          ? `${booking.location.nickname ? `(${booking.location.nickname}) ` : ''}${booking.location.address_line1}`
+                          : 'Ubicación no disponible'}
+                    </Text>
                   </View>
-                   {/* --- Botón WhatsApp --- */}
-                   {booking.client?.phone_number && (
-                    <TouchableOpacity 
-                      style={styles.whatsappButton} 
-                      onPress={() => handleWhatsAppPress(booking.client.phone_number, booking.client.full_name)}
-                    >
-                      <MessageCircle size={18} color={theme.colors.success} /> 
-                      <Text style={styles.whatsappButtonText}>Contactar Cliente</Text>
-                    </TouchableOpacity>
-                  )}
                 </View>
                  <View style={styles.cardFooter}>
-                   <Text style={styles.detailsLink}>Ver Detalles</Text>
-                  <ChevronRight size={20} color={theme.colors.primary} />
-                </View>
-                {/* --- Botones de Acción --- */}
-                <View style={styles.actionButtonsContainer}>
-                  {booking.status === 'confirmado' && (
-                    <TouchableOpacity 
-                      style={[styles.actionButton, styles.inProgressButton]}
-                      onPress={() => markAsInProgress(booking.id)}
+                   <TouchableOpacity 
+                        style={styles.whatsAppButton}
+                        onPress={(e) => {
+                            e.stopPropagation(); // Evitar que el TouchableOpacity padre se active
+                            handleWhatsAppPress(booking.client?.phone_number, booking.client?.full_name);
+                        }}
                     >
-                      <PlayCircle size={16} color={theme.colors.white} />
-                      <Text style={styles.actionButtonText}>Marcar en Progreso</Text>
+                       <MessageCircle size={18} color={theme.colors.success} />
+                       <Text style={styles.whatsAppButtonText}>Contactar Cliente</Text>
                     </TouchableOpacity>
-                  )}
-                  {booking.status === 'en_progreso' && (
-                    <TouchableOpacity 
-                      style={[styles.actionButton, styles.completedButton]}
-                      onPress={() => markAsCompleted(booking.id)}
-                    >
-                      <CheckCircle size={16} color={theme.colors.white} />
-                      <Text style={styles.actionButtonText}>Marcar Completado</Text>
-                    </TouchableOpacity>
-                  )}
+                    {booking.status === 'confirmado' && (
+                        <TouchableOpacity 
+                            style={styles.actionButton}
+                            onPress={(e) => { 
+                                e.stopPropagation();
+                                markAsInProgress(booking.id);
+                             }}
+                        >
+                            <PlayCircle size={18} color={theme.colors.info} />
+                            <Text style={styles.actionButtonText}>Iniciar Servicio</Text>
+                        </TouchableOpacity>
+                    )}
+                     {booking.status === 'en_progreso' && (
+                        <TouchableOpacity 
+                             style={styles.actionButton}
+                             onPress={(e) => {
+                                e.stopPropagation();
+                                markAsCompleted(booking.id);
+                             }}
+                         >
+                            <CheckCircle size={18} color={theme.colors.success} />
+                            <Text style={styles.actionButtonText}>Marcar Completado</Text>
+                        </TouchableOpacity>
+                    )}
+                 </View>
+                <View style={styles.chevronContainer}>
+                   <ChevronRight size={20} color={theme.colors.text.secondary} />
                 </View>
               </TouchableOpacity>
-            ))}
+            )})} 
           </View>
         )}
       </ScrollView>
-      <Toast />
+       <Toast />
     </View>
   );
 }
 
-// --- Estilos (Copiados de services.js, ajustar si es necesario) ---
-const styles = StyleSheet.create({
+// Function to generate styles based on the theme
+const getStyles = (theme) => StyleSheet.create({
   outerContainer: {
     flex: 1,
-    backgroundColor: theme.colors.background,
+    backgroundColor: theme.colors.background, // Use theme color
+  },
+  header: {
+    backgroundColor: theme.colors.surface, // Use theme color
+    padding: theme.spacing.lg,
+    paddingTop: Platform.OS === 'android' ? theme.spacing.xl + 15 : 50,
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border, // Use theme color
+    ...theme.shadows.sm,
+  },
+  title: {
+    ...theme.typography.h1,
+    color: theme.colors.text.primary, // Use theme color
+    fontSize: 24, // Adjust size if needed
   },
   container: {
     flex: 1,
   },
-  header: {
-    padding: theme.spacing.lg,
-    paddingHorizontal: theme.spacing.xl,
-    paddingTop: Platform.OS === 'android' ? theme.spacing.xl + 10 : 48,
-    backgroundColor: theme.colors.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
-  },
-  title: {
-    ...theme.typography.h1,
-    color: theme.colors.text.primary,
+  scrollContent: {
+      flexGrow: 1, // Ensure scrollview takes height for loader/empty message
+      padding: theme.spacing.lg,
   },
   loader: {
-    marginTop: 50,
-  },
-  list: {
-    padding: theme.spacing.lg,
-    gap: theme.spacing.lg,
-  },
-  card: {
-    backgroundColor: theme.colors.surface,
-    borderRadius: theme.borderRadius.lg,
-    ...theme.shadows.md,
-    overflow: 'hidden', 
-  },
-   cardHeader: {
-     paddingHorizontal: theme.spacing.lg,
-     paddingTop: theme.spacing.lg,
-     paddingBottom: theme.spacing.md,
-     flexDirection: 'row', // Para poner nombre y estado en la misma línea
-     justifyContent: 'space-between', // Separar nombre y estado
-     alignItems: 'center',
-   },
-   serviceName: {
-     ...theme.typography.h3,
-     color: theme.colors.text.primary,
-     flexShrink: 1, // Permitir que el nombre se acorte si es largo
-     marginRight: theme.spacing.md, // Espacio entre nombre y estado
-   },
-   statusText: { // Estilo para el texto del estado
-     ...theme.typography.caption,
-     color: theme.colors.primary, // O un color que represente el estado
-     fontWeight: 'bold',
-     textTransform: 'capitalize',
-   },
-   cardBody: {
-     paddingHorizontal: theme.spacing.lg,
-     paddingBottom: theme.spacing.md,
-     gap: theme.spacing.sm,
-   },
-  detailRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: theme.spacing.sm,
-  },
-  detailText: {
-    ...theme.typography.body,
-    color: theme.colors.text.secondary,
-    flexShrink: 1, 
-  },
-  cardFooter: {
-     flexDirection: 'row',
-     justifyContent: 'flex-end',
-     alignItems: 'center',
-     backgroundColor: theme.colors.background, 
-     paddingHorizontal: theme.spacing.lg,
-     paddingVertical: theme.spacing.md,
-     borderTopWidth: 1,
-     borderTopColor: theme.colors.border,
-     gap: theme.spacing.xs,
-  },
-  detailsLink: {
-     ...theme.typography.button,
-     color: theme.colors.primary,
-     fontWeight: '600',
+    marginTop: theme.spacing.xxl,
   },
   noItemsContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: theme.spacing.xl,
-    minHeight: 200,
   },
   noItemsText: {
     ...theme.typography.body,
-    color: theme.colors.text.secondary,
+    color: theme.colors.text.secondary, // Use theme color
     textAlign: 'center',
+    marginBottom: theme.spacing.sm,
   },
-  // --- Estilos WhatsApp ---
-  whatsappButton: {
+  noItemsSubText: {
+      ...theme.typography.caption,
+      color: theme.colors.text.tertiary,
+      textAlign: 'center',
+  },
+  list: {
+    gap: theme.spacing.lg, // Space between cards
+  },
+  card: {
+    backgroundColor: theme.colors.surface, // Use theme color
+    borderRadius: theme.borderRadius.lg,
+    padding: theme.spacing.md,
+    ...theme.shadows.sm,
+    borderWidth: 1,
+    borderColor: theme.colors.border, // Use theme color
+    position: 'relative', // For absolute positioning of chevron
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start', // Align top for potentially wrapping text
+    marginBottom: theme.spacing.sm,
+    paddingBottom: theme.spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border, // Use theme color
+  },
+  serviceName: {
+    ...theme.typography.h3,
+    color: theme.colors.text.primary, // Use theme color
+    flex: 1, // Allow wrapping
+    marginRight: theme.spacing.sm,
+  },
+  statusText: {
+      ...theme.typography.caption,
+      fontWeight: 'bold',
+      marginLeft: theme.spacing.sm, // Space from service name
+  },
+  cardBody: {
+    marginBottom: theme.spacing.md,
+    gap: theme.spacing.xs, // Space between detail rows
+  },
+  detailRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: theme.spacing.sm, // Aumentar un poco el espacio
-    paddingVertical: theme.spacing.xs, // Menos padding vertical
-    marginTop: theme.spacing.sm, // Espacio arriba
-    alignSelf: 'flex-start', // Para que no ocupe todo el ancho
-    // backgroundColor: '#e7f8e8', // Fondo sutil opcional
-    // borderRadius: theme.borderRadius.sm,
-    // paddingHorizontal: theme.spacing.md,
+    gap: theme.spacing.sm,
   },
-  whatsappButtonText: {
-     ...theme.typography.body, // Usar tamaño body
-     color: theme.colors.success, 
-     fontWeight: '600', // Un poco más grueso
+  detailText: {
+    ...theme.typography.body2,
+    color: theme.colors.text.secondary, // Use theme color
+    flexShrink: 1, // Allow text to shrink if needed
   },
-  // --- Estilos Botones de Acción ---
-  actionButtonsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-around', // O 'flex-end' si los quieres a la derecha
-    paddingHorizontal: theme.spacing.lg,
-    paddingVertical: theme.spacing.md,
-    borderTopWidth: 1, // Separador visual ligero
-    borderTopColor: theme.colors.border,
-    backgroundColor: theme.colors.surface, // Mismo fondo que la tarjeta
+  cardFooter: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginTop: theme.spacing.md,
+      paddingTop: theme.spacing.md,
+      borderTopWidth: 1,
+      borderTopColor: theme.colors.border, // Use theme color
+      gap: theme.spacing.md,
+  },
+  whatsAppButton: {
+     flexDirection: 'row',
+     alignItems: 'center',
+     gap: theme.spacing.xs,
+     padding: theme.spacing.xs,
+  },
+  whatsAppButtonText: {
+      ...theme.typography.caption,
+      color: theme.colors.success,
+      fontWeight: 'bold',
   },
   actionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: theme.spacing.sm,
-    paddingHorizontal: theme.spacing.md,
-    borderRadius: theme.borderRadius.md,
-    gap: theme.spacing.xs,
-    ...theme.shadows.sm, // Sombra sutil
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: theme.spacing.xs,
+      padding: theme.spacing.xs,
   },
   actionButtonText: {
-    ...theme.typography.button, // Estilo de botón
-    color: theme.colors.white, // Texto blanco
-    fontWeight: '600',
+      ...theme.typography.caption,
+      color: theme.colors.text.primary,
+      fontWeight: 'bold',
   },
-  inProgressButton: {
-    backgroundColor: theme.colors.primary, // Azul primario
-  },
-  completedButton: {
-    backgroundColor: theme.colors.success, // Verde éxito
+  chevronContainer: {
+    position: 'absolute',
+    right: theme.spacing.md,
+    top: '50%', // Adjust vertical position
+    transform: [{ translateY: -10 }], // Center vertically
   },
 }); 

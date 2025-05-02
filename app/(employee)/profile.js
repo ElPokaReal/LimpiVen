@@ -1,11 +1,13 @@
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
-import { theme } from '../theme';
+import { useTheme } from '../../constants/ThemeContext';
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { LogOut, Star } from 'lucide-react-native';
 import Toast from 'react-native-toast-message';
 
 export default function EmployeeProfile() {
+  const { theme } = useTheme();
+  const styles = getStyles(theme);
   const [loading, setLoading] = useState(false);
   const [ratingData, setRatingData] = useState({ average: null, count: 0 });
   const [ratingLoading, setRatingLoading] = useState(true);
@@ -87,9 +89,6 @@ export default function EmployeeProfile() {
         )}
       </View>
 
-      {/* Aquí se mostrará y editará el perfil del empleado */}
-      {/* TODO: Añadir campos editables (nombre, etc.) */}
-
       <TouchableOpacity 
         style={[styles.logoutButton, loading && styles.buttonDisabled]} 
         onPress={handleLogout}
@@ -110,7 +109,7 @@ export default function EmployeeProfile() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (theme) => StyleSheet.create({
   container: {
     flex: 1,
     justifyContent: 'center',

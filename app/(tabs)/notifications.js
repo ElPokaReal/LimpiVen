@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, RefreshControl, Alert, ScrollView, Platform } from 'react-native';
 import { supabase } from '../../lib/supabase'; // Asegúrate que la ruta sea correcta
-import { theme } from '../theme'; // Asegúrate que la ruta sea correcta
+import { useTheme } from '../../constants/ThemeContext'; // Import useTheme
 import Toast from 'react-native-toast-message';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import Swipeable from 'react-native-gesture-handler/Swipeable';
@@ -9,19 +9,22 @@ import { Trash2, BellRing, CheckCircle, AlertCircle } from 'lucide-react-native'
 import { useRouter } from 'expo-router'; // Importar useRouter
 
 // --- Helper para formatear y traducir tipos de notificación ---
-const formatNotification = (item) => {
+const formatNotification = (item, theme) => {
   let title = item.type; // Valor por defecto
   let Icon = BellRing; // Icono por defecto
+  let iconColor = !item.is_read ? theme.colors.primary : theme.colors.text.secondary;
   const message = item.message || 'Detalles no disponibles.'; // Mensaje principal
 
   switch (item.type) {
     case 'booking_confirmed':
       title = 'Reserva Confirmada';
       Icon = CheckCircle;
+      iconColor = theme.colors.success;
       break;
     case 'booking_cancelled':
       title = 'Reserva Cancelada';
       Icon = AlertCircle;
+      iconColor = theme.colors.error;
       break;
     case 'new_booking_request':
       title = 'Nueva Solicitud de Reserva';
@@ -37,11 +40,13 @@ const formatNotification = (item) => {
       title = item.type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
   }
 
-  return { title, message, Icon };
+  return { title, message, Icon, defaultIconColor: iconColor };
 };
 
 export default function Notifications() {
   const router = useRouter(); // Inicializar router
+  const { theme } = useTheme(); // Use theme hook
+  const styles = getStyles(theme); // Get styles from theme
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -211,12 +216,11 @@ export default function Notifications() {
   };
 
   // Renderizado de la acción de deslizamiento (botón Eliminar)
-  const renderRightActions = (progress, dragX, item) => {
-    // No necesita progress ni dragX si usamos onPress directo
+  const renderRightActions = (item) => {
     return (
       <TouchableOpacity
         style={styles.deleteButton}
-        onPress={() => handleDeleteNotification(item.id)} // Llamar a la función con confirmación
+        onPress={() => handleDeleteNotification(item.id)}
       >
         <Trash2 size={20} color={theme.colors.onError} />
         <Text style={styles.deleteButtonText}>Eliminar</Text>
@@ -226,11 +230,12 @@ export default function Notifications() {
 
   // Renderizado de cada item de notificación (ahora clickeable y con formato)
   const renderNotificationItem = ({ item }) => {
-    const { title, message, Icon } = formatNotification(item); // Obtener título, mensaje e icono formateados
+    const { title, message, Icon, defaultIconColor } = formatNotification(item, theme);
+    const iconColor = !item.is_read ? theme.colors.primary : defaultIconColor;
 
     return (
       <Swipeable
-        renderRightActions={(progress, dragX) => renderRightActions(progress, dragX, item)}
+        renderRightActions={() => renderRightActions(item)}
         overshootRight={false}
       >
         <TouchableOpacity 
@@ -240,7 +245,7 @@ export default function Notifications() {
         >
           <View style={styles.notificationContent}>
              <View style={styles.iconContainer}>
-                <Icon size={24} color={!item.is_read ? theme.colors.primary : theme.colors.text.secondary} />
+                <Icon size={24} color={iconColor} />
              </View>
              <View style={styles.textContainer}>
                 <Text style={[styles.notificationTitle, !item.is_read && styles.unreadText]}>{title}</Text>
@@ -303,7 +308,7 @@ export default function Notifications() {
 }
 
 // --- Estilos (Ajustes y adiciones) ---
-const styles = StyleSheet.create({
+const getStyles = (theme) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: theme.colors.background,

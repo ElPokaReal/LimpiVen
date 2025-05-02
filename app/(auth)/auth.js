@@ -1,7 +1,7 @@
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ArrowLeft, Mail, Lock } from 'lucide-react-native';
-import { theme } from '../theme';
+import { useTheme } from '../../constants/ThemeContext';
 import { useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import Toast from 'react-native-toast-message';
@@ -9,37 +9,36 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function Auth() {
   const router = useRouter();
+  const { theme } = useTheme();
+  const styles = getStyles(theme);
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // Función auxiliar para mostrar errores con Toast
   const showErrorToast = (message, title = 'Error') => {
     Toast.show({ type: 'error', text1: title, text2: message });
   };
 
-  // Función auxiliar para guardar datos del usuario en AsyncStorage
   const saveUserDataLocally = async (user, userDataFromDB) => {
     try {
       await AsyncStorage.setItem('id', user.id);
       await AsyncStorage.setItem('email', user.email);
-      // Asegurarse que userDataFromDB.full_name no sea null o undefined
       const fullName = userDataFromDB?.full_name || '';
       await AsyncStorage.setItem('full_name', fullName);
       console.log("User data saved to AsyncStorage:", { id: user.id, email: user.email, name: fullName });
-      return true; // Indica éxito
+      return true;
     } catch (storageError) {
       console.error("Error saving user data to AsyncStorage:", storageError);
       showErrorToast('No se pudo guardar la información localmente.', 'Error de almacenamiento');
-      return false; // Indica fallo
+      return false;
     }
   };
 
-  // Función auxiliar para obtener datos adicionales del usuario desde la DB
   const fetchUserDataFromDB = async (userId) => {
     const { data, error } = await supabase
         .from('users')
-        .select('role, full_name') // Solo pedimos lo que necesitamos aquí
+        .select('role, full_name')
         .eq('id', userId)
         .single();
 
@@ -52,14 +51,11 @@ export default function Auth() {
         showErrorToast('Perfil de usuario no encontrado en la base de datos.');
         return null;
     }
-    return data; // Devuelve { role, full_name }
+    return data;
   };
 
-  // Lógica principal de inicio de sesión refactorizada
   const handleLogin = async () => {
     setLoading(true);
-
-    // 1. Validación básica de campos
     if (!email || !password) {
       showErrorToast('Por favor ingresa tu email y contraseña');
       setLoading(false);
@@ -67,7 +63,6 @@ export default function Auth() {
     }
 
     try {
-      // 2. Autenticar con Supabase Auth
       const { data: authData, error: signInError } = await supabase.auth.signInWithPassword({
         email: email,
         password: password,
@@ -91,24 +86,18 @@ export default function Auth() {
       }
       
       const user = authData.user;
-
-      // 3. Obtener datos adicionales (rol, nombre) de la tabla 'users'
       const userDataFromDB = await fetchUserDataFromDB(user.id);
       if (!userDataFromDB) {
-          // fetchUserDataFromDB ya muestra el Toast en caso de error
           setLoading(false);
           return;
       }
 
-      // 4. Guardar datos esenciales en AsyncStorage
       const saved = await saveUserDataLocally(user, userDataFromDB);
       if (!saved) {
-          // saveUserDataLocally ya muestra el Toast en caso de error
           setLoading(false);
           return;
       }
 
-      // 5. Redirección basada en rol
       Toast.show({
         type: 'success',
         text1: 'Éxito',
@@ -122,38 +111,31 @@ export default function Auth() {
         router.replace('/(tabs)/');
       } else {
         console.warn('Rol de usuario desconocido o no manejado:', userRole);
-        // Idealmente, no deberíamos llegar aquí si la DB está bien, pero por si acaso:
         showErrorToast(`Rol '${userRole}' no reconocido. Contacte soporte.`); 
-        // O podrías redirigir a '/' pero mostrando error primero
          router.replace('/'); 
       }
       
     } catch (error) {
-      // Captura errores generales inesperados durante el proceso
       console.error("Unexpected login error:", error);
       showErrorToast(error instanceof Error ? error.message : 'Ocurrió un error desconocido', 'Error inesperado');
     } finally {
-      // Asegurarse de que loading se desactive siempre
       setLoading(false); 
     }
   };
 
   const handleSignUp = () => {
-    router.push('/client-signup');
+    router.push('client-signup');
   };
 
   const handleForgotPassword = () => {
-    // TODO: Implementar navegación a pantalla de olvido de contraseña
     Toast.show({ type: 'info', text1: 'Próximamente', text2: 'Función de recuperar contraseña aún no implementada.'})
-    // router.push('/forgot-password'); 
   };
 
   const handleBackPress = () => {
     if (router.canGoBack()) {
       router.back();
     } else {
-      // Si no se puede volver, ir a la pantalla inicial pública
-      router.replace('/'); // Asumiendo que '/' será la pantalla pública principal
+      router.replace('/');
     }
   };
 
@@ -178,7 +160,7 @@ export default function Auth() {
           <View style={styles.inputContainer}>
             <Text style={styles.label}>Correo electrónico</Text>
             <View style={styles.inputWrapper}>
-              <Mail size={20} color={theme.colors.text.light} style={styles.inputIcon} />
+              <Mail size={20} color={theme.colors.text.placeholder} style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
                 placeholder="tu@email.com"
@@ -186,7 +168,8 @@ export default function Auth() {
                 autoCapitalize="none"
                 value={email}
                 onChangeText={setEmail}
-                placeholderTextColor={theme.colors.text.light}
+                placeholderTextColor={theme.colors.text.placeholder}
+                editable={!loading}
               />
             </View>
           </View>
@@ -194,14 +177,15 @@ export default function Auth() {
           <View style={styles.inputContainer}>
             <Text style={styles.label}>Contraseña</Text>
             <View style={styles.inputWrapper}>
-              <Lock size={20} color={theme.colors.text.light} style={styles.inputIcon} />
+              <Lock size={20} color={theme.colors.text.placeholder} style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
                 placeholder="Tu contraseña"
                 secureTextEntry
                 value={password}
                 onChangeText={setPassword}
-                placeholderTextColor={theme.colors.text.light}
+                placeholderTextColor={theme.colors.text.placeholder}
+                editable={!loading}
               />
             </View>
           </View>
@@ -210,6 +194,7 @@ export default function Auth() {
             style={styles.forgotPassword}
             activeOpacity={0.8}
             onPress={handleForgotPassword} 
+            disabled={loading}
           >
             <Text style={styles.forgotPasswordText}>¿Olvidaste tu contraseña?</Text>
           </TouchableOpacity>
@@ -222,15 +207,18 @@ export default function Auth() {
             activeOpacity={0.8}
             disabled={loading}
           >
-            <Text style={styles.buttonText}>
-              {loading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
-            </Text>
+            {loading ? (
+                <ActivityIndicator color={theme.colors.surface} />
+            ) : (
+                <Text style={styles.buttonText}>Iniciar Sesión</Text>
+            )}
           </TouchableOpacity>
 
           <TouchableOpacity 
-            style={[styles.button, styles.registerButton]}
+            style={[styles.button, styles.registerButton, loading && styles.buttonDisabled]}
             onPress={handleSignUp}
             activeOpacity={0.8}
+            disabled={loading}
           >
             <Text style={[styles.buttonText, styles.registerButtonText]}>Crear Cuenta</Text>
           </TouchableOpacity>
@@ -241,7 +229,7 @@ export default function Auth() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (theme) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: theme.colors.background,

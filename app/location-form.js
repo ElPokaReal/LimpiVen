@@ -14,12 +14,14 @@ import {
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { ArrowLeft, Save } from 'lucide-react-native';
 import { supabase } from '../lib/supabase'; 
-import { theme } from './theme'; 
+import { useTheme } from '../constants/ThemeContext';
 import Toast from 'react-native-toast-message';
 
 export default function LocationFormScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams(); // Para recibir datos al editar
+  const params = useLocalSearchParams();
+  const { theme } = useTheme();
+  const styles = getStyles(theme);
   const isEditing = params.locationId ? true : false;
 
   const [loading, setLoading] = useState(false);
@@ -27,29 +29,26 @@ export default function LocationFormScreen() {
   const [nickname, setNickname] = useState('');
   const [addressLine1, setAddressLine1] = useState('');
   const [addressLine2, setAddressLine2] = useState('');
-  const [city, setCity] = useState('');
-  const [country, setCountry] = useState(''); // Podrías poner un valor por defecto si solo operas en uno
 
   // Cargar datos del usuario y datos de la ubicación si estamos editando
   useEffect(() => {
     const initialize = async () => {
-      setLoading(true);
+      setLoading(!isEditing || (isEditing && params.locationId));
       try {
         const { data: { user }, error: userError } = await supabase.auth.getUser();
         if (userError || !user) {
           Toast.show({ type: 'error', text1: 'Error', text2: 'Usuario no autenticado.' });
-          router.replace('/(auth)/auth'); // O a tu pantalla principal pública
+          router.replace('/(auth)/auth');
           return;
         }
         setUserId(user.id);
 
-        // Si estamos editando, cargar datos de la ubicación
         if (isEditing && params.locationId) {
           const { data: locationData, error: locationError } = await supabase
             .from('user_locations')
             .select('*')
             .eq('id', params.locationId)
-            .eq('user_id', user.id) // Asegurar que sea del usuario
+            .eq('user_id', user.id)
             .single();
 
           if (locationError) throw locationError;
@@ -58,11 +57,9 @@ export default function LocationFormScreen() {
             setNickname(locationData.nickname || '');
             setAddressLine1(locationData.address_line1 || '');
             setAddressLine2(locationData.address_line2 || '');
-            setCity(locationData.city || '');
-            setCountry(locationData.country || ''); 
           } else {
              Toast.show({ type: 'error', text1: 'Error', text2: 'Ubicación no encontrada.' });
-             router.back(); // Volver si no se encuentra
+             router.back();
           }
         }
       } catch (error) {
@@ -167,7 +164,7 @@ export default function LocationFormScreen() {
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
       >
-        {/* Campos del Formulario */}
+
         <Text style={styles.label}>Apodo (Opcional, ej: Casa, Oficina)</Text>
         <TextInput
           style={styles.input}
@@ -202,7 +199,7 @@ export default function LocationFormScreen() {
 }
 
 // --- Estilos --- (Basados en request-service.js con adaptaciones)
-const styles = StyleSheet.create({
+const getStyles = (theme) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: theme.colors.background,

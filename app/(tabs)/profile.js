@@ -1,18 +1,20 @@
-import { View, Text, StyleSheet, TouchableOpacity, Animated, RefreshControl, ScrollView, Image } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Animated, RefreshControl, ScrollView, Image, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
-import { User, Settings, Clock, LogOut } from 'lucide-react-native';
+import { User, Settings, Clock, LogOut, ChevronRight } from 'lucide-react-native';
 import { useEffect, useRef, useState, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../../lib/supabase';
-import { theme } from '../theme';
+import { useTheme } from '../../constants/ThemeContext';
 import Toast from 'react-native-toast-message';
 
 export default function Profile() {
   const router = useRouter();
+  const { theme } = useTheme();
+  const styles = getStyles(theme);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const [userData, setUserData] = useState({
-    name: '' || "Usuario",
-    email: '' || "email@example.com",
+    name: 'Usuario',
+    email: 'cargando...',
     avatar_url: null,
   });
   const [refreshing, setRefreshing] = useState(false);
@@ -49,6 +51,7 @@ export default function Profile() {
       
       if (!authUser) {
           console.warn('No authenticated user found during fetch.');
+          Toast.show({ type: 'error', text1: 'Error', text2: 'No se encontró usuario autenticado.' });
           return;
       }
 
@@ -62,16 +65,18 @@ export default function Profile() {
 
       if (userDataDB) {
         console.log("Fetched user data from DB:", userDataDB);
-        setUserData({
-          name: userDataDB.full_name,
-          email: userDataDB.email,
+        const newUserData = {
+          name: userDataDB.full_name || 'Nombre no encontrado',
+          email: userDataDB.email || 'Email no encontrado',
           avatar_url: userDataDB.avatar_url,
-        });
-        await AsyncStorage.setItem('full_name', userDataDB.full_name || '');
-        await AsyncStorage.setItem('email', userDataDB.email || '');
-        await AsyncStorage.setItem('avatar_url', userDataDB.avatar_url || '');
+        };
+        setUserData(newUserData);
+        await AsyncStorage.setItem('full_name', newUserData.name);
+        await AsyncStorage.setItem('email', newUserData.email);
+        await AsyncStorage.setItem('avatar_url', newUserData.avatar_url || '');
       } else {
           console.warn('User data not found in DB for authenticated user:', authUser.id);
+          Toast.show({ type: 'warning', text1: 'Advertencia', text2: 'No se encontró el perfil completo en la base de datos.' });
       }
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -84,46 +89,45 @@ export default function Profile() {
   useEffect(() => {
     loadInitialData();
     fetchData();
+  }, [loadInitialData, fetchData]);
 
+  useEffect(() => {
     const handleUserUpdate = async (payload) => {
-        console.log('Realtime user update received:', payload);
-        const { data: { session } } = await supabase.auth.getSession();
-        if (payload.new.id === session?.user?.id) {
-            console.log('Updating local state for current user');
-            setUserData({
-                name: payload.new.full_name,
-                email: payload.new.email,
-                avatar_url: payload.new.avatar_url,
-            });
-            await AsyncStorage.setItem('full_name', payload.new.full_name || '');
-            await AsyncStorage.setItem('email', payload.new.email || '');
-            await AsyncStorage.setItem('avatar_url', payload.new.avatar_url || '');
-        }
+      console.log('Realtime user update received:', payload);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (payload.new.id === session?.user?.id) {
+        console.log('Updating local state for current user');
+        const updatedData = {
+          name: payload.new.full_name || 'Usuario',
+          email: payload.new.email || 'email@example.com',
+          avatar_url: payload.new.avatar_url,
+        };
+        setUserData(updatedData);
+        await AsyncStorage.setItem('full_name', updatedData.name);
+        await AsyncStorage.setItem('email', updatedData.email);
+        await AsyncStorage.setItem('avatar_url', updatedData.avatar_url || '');
+      }
     };
 
-    const subscription = supabase
+    const usersSubscription = supabase
       .channel('public:users')
-      .on('postgres_changes', 
-        { 
-          event: 'UPDATE', 
-          schema: 'public', 
-          table: 'users' 
-        }, 
+      .on('postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'users' },
         handleUserUpdate
       )
       .subscribe((status, err) => {
-          if (status === 'SUBSCRIBED') {
-              console.log('Realtime channel subscribed for users table');
-          } else {
-              console.error('Realtime subscription failed:', status, err);
-          }
+        if (status === 'SUBSCRIBED') {
+          console.log('Realtime channel subscribed for users table (Profile Screen)');
+        } else {
+          console.error('Realtime subscription failed (Profile Screen):', status, err);
+        }
       });
 
     return () => {
-        console.log('Unsubscribing from Realtime channel');
-        supabase.removeChannel(subscription);
+      console.log('Unsubscribing from Realtime users channel (Profile Screen due to unmount)');
+      supabase.removeChannel(usersSubscription);
     };
-  }, [loadInitialData, fetchData]);
+  }, []);
 
   const onRefresh = useCallback(() => {
       fetchData(true);
@@ -153,7 +157,7 @@ export default function Profile() {
   return (
     <Animated.View style={[styles.container, { opacity: fadeAnim }]}>
       <ScrollView
-        contentContainerStyle={{ flexGrow: 1 }}
+        contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
@@ -179,63 +183,79 @@ export default function Profile() {
         </View>
 
         <View style={styles.menu}>
-           <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/edit-profile')}>
-             <User size={20} color={theme.colors.primary} />
-             <Text style={styles.menuText}>Editar Perfil</Text>
+           <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/edit-profile')} activeOpacity={0.7}>
+             <View style={styles.menuItemContent}>
+                <User size={20} color={theme.colors.primary} />
+                <Text style={styles.menuText}>Editar Perfil</Text>
+             </View>
+             <ChevronRight size={20} color={theme.colors.text.secondary} />
            </TouchableOpacity>
- 
-           <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/(tabs)/history')}> 
-             <Clock size={20} color={theme.colors.primary} />
-             <Text style={styles.menuText}>Historial de Servicios</Text>
+
+           <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/service-history')} activeOpacity={0.7}>
+             <View style={styles.menuItemContent}>
+                 <Clock size={20} color={theme.colors.primary} />
+                 <Text style={styles.menuText}>Historial de Servicios</Text>
+             </View>
+             <ChevronRight size={20} color={theme.colors.text.secondary} />
            </TouchableOpacity>
- 
-           <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/settings')}>
-             <Settings size={20} color={theme.colors.primary} />
-             <Text style={styles.menuText}>Ajustes</Text>
+
+           <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/settings')} activeOpacity={0.7}>
+             <View style={styles.menuItemContent}>
+                 <Settings size={20} color={theme.colors.primary} />
+                 <Text style={styles.menuText}>Ajustes</Text>
+             </View>
+             <ChevronRight size={20} color={theme.colors.text.secondary} />
            </TouchableOpacity>
         </View>
 
       </ScrollView>
        <View style={styles.logoutContainer}>
-          <TouchableOpacity style={styles.logoutButton} onPress={handleLogout} disabled={loadingLogout}>
+          <TouchableOpacity 
+             style={[styles.logoutButton, loadingLogout && styles.buttonDisabled]} 
+             onPress={handleLogout} 
+             disabled={loadingLogout}
+             activeOpacity={0.7}
+          >
              <LogOut size={20} color={theme.colors.error} />
              <Text style={styles.logoutText}>Cerrar Sesión</Text>
-             {loadingLogout && <ActivityIndicator color={theme.colors.error} style={{marginLeft: 10}}/>} 
+             {loadingLogout && <ActivityIndicator color={theme.colors.error} style={styles.logoutLoader}/>} 
           </TouchableOpacity>
         </View>
+         <Toast />
     </Animated.View>
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (theme) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: theme.colors.background,
   },
+  scrollContent: {
+     flexGrow: 1,
+     paddingBottom: theme.spacing.xxl,
+  },
   profileHeader: {
     alignItems: 'center',
-    paddingVertical: theme.spacing.xl * 1.5,
+    paddingVertical: theme.spacing.xl,
+    paddingBottom: theme.spacing.xl * 1.5,
     backgroundColor: theme.colors.primary,
     borderBottomLeftRadius: theme.borderRadius.xl,
     borderBottomRightRadius: theme.borderRadius.xl,
-    marginBottom: theme.spacing.xl,
+    marginBottom: theme.spacing.lg,
     ...theme.shadows.md,
   },
   avatarContainer: {
-      marginBottom: theme.spacing.lg,
+      marginBottom: theme.spacing.md,
       width: 120,
       height: 120,
       borderRadius: 60,
-      backgroundColor: theme.colors.primaryVariant,
       justifyContent: 'center',
       alignItems: 'center',
       borderWidth: 3,
       borderColor: theme.colors.surface,
-      elevation: 5,
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.2,
-      shadowRadius: 4,
+      backgroundColor: theme.colors.primaryVariant,
+      ...theme.shadows.sm,
   },
   avatar: {
       width: '100%',
@@ -252,53 +272,61 @@ const styles = StyleSheet.create({
   },
   profileName: {
     ...theme.typography.h1,
-    color: theme.colors.onPrimary,
-    marginBottom: theme.spacing.xs,
+    color: theme.colors.surface,
+    marginTop: theme.spacing.sm,
   },
   profileEmail: {
-    ...theme.typography.body,
-    color: theme.colors.onPrimaryMuted,
+    ...theme.typography.body1,
+    color: theme.colors.surface + 'B3',
   },
   menu: {
-    marginTop: theme.spacing.lg,
     paddingHorizontal: theme.spacing.lg,
+    marginTop: theme.spacing.md,
   },
   menuItem: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
     paddingVertical: theme.spacing.lg,
-    paddingHorizontal: theme.spacing.md,
-    backgroundColor: theme.colors.surface,
-    borderRadius: theme.borderRadius.md,
-    marginBottom: theme.spacing.md,
-    ...theme.shadows.xs,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
+  },
+  menuItemContent: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: theme.spacing.md,
   },
   menuText: {
-    marginLeft: theme.spacing.lg,
-    ...theme.typography.button,
+    ...theme.typography.body1,
     color: theme.colors.text.primary,
     fontSize: 16,
   },
   logoutContainer: {
     padding: theme.spacing.lg,
-    marginTop: 'auto',
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.border,
+    backgroundColor: theme.colors.background,
   },
   logoutButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: theme.spacing.lg,
-    backgroundColor: theme.colors.surface,
+    paddingVertical: theme.spacing.md,
     borderRadius: theme.borderRadius.md,
+    backgroundColor: theme.colors.surface,
     borderWidth: 1,
-    borderColor: theme.colors.error,
-    ...theme.shadows.sm,
+    borderColor: theme.colors.border,
+    gap: theme.spacing.sm,
   },
   logoutText: {
-    marginLeft: theme.spacing.sm,
     ...theme.typography.button,
     color: theme.colors.error,
     fontSize: 16,
-    fontWeight: 'bold',
   },
+  logoutLoader: {
+      marginLeft: theme.spacing.sm,
+  },
+  buttonDisabled: {
+    opacity: 0.6,
+  }
 });

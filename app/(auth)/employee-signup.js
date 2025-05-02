@@ -1,7 +1,7 @@
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, KeyboardAvoidingView, ScrollView, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, KeyboardAvoidingView, ScrollView, Platform, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ArrowLeft, User, Mail, Lock, Phone } from 'lucide-react-native';
-import { theme } from '../theme';
+import { useTheme } from '../../constants/ThemeContext';
 import { useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import Toast from 'react-native-toast-message';
@@ -23,6 +23,9 @@ const simpleHash = (str) => {
 
 export default function EmployeeSignup() {
   const router = useRouter();
+  const { theme } = useTheme();
+  const styles = getStyles(theme);
+
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     fullName: '',
@@ -37,154 +40,124 @@ export default function EmployeeSignup() {
   };
 
   const handleSubmit = async () => {
+    let createdUserId = null;
     try {
       setLoading(true);
 
-      // Validaciones
       if (!formData.fullName || !formData.email || !formData.password || !formData.confirmPassword || !formData.phone) {
-        Toast.show({
-          type: 'error',
-          text1: 'Error',
-          text2: 'Todos los campos son requeridos'
-        });
+        Toast.show({ type: 'error', text1: 'Error', text2: 'Todos los campos son requeridos' });
         setLoading(false);
         return;
       }
 
       if (formData.password !== formData.confirmPassword) {
-        Toast.show({
-          type: 'error',
-          text1: 'Error',
-          text2: 'Las contraseñas no coinciden'
-        });
+        Toast.show({ type: 'error', text1: 'Error', text2: 'Las contraseñas no coinciden' });
         setLoading(false);
         return;
       }
 
       if (formData.password.length < 6) {
-        Toast.show({
-          type: 'error',
-          text1: 'Error',
-          text2: 'La contraseña debe tener al menos 6 caracteres'
-        });
+        Toast.show({ type: 'error', text1: 'Error', text2: 'La contraseña debe tener al menos 6 caracteres' });
         setLoading(false);
         return;
       }
 
-      // Ya no necesitamos hashear manualmente la contraseña
-      // const passwordHash = simpleHash(formData.password);
-
-      // 1. Registrar al usuario en Supabase Auth
+      // 1. Sign up user in Supabase Auth
       const { data: authData, error: signUpError } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
         options: {
-          // Podemos intentar pasar datos adicionales aquí, aunque los insertaremos después
-          data: { 
-            full_name: formData.fullName,
-            // No establecemos el 'role' aquí directamente en la tabla auth.users
-            // Lo haremos en nuestra tabla 'users'
-          }
+          data: { full_name: formData.fullName }
         }
       });
 
       if (signUpError) {
-        // Manejar errores específicos de signUp, como correo ya registrado
-         if (signUpError.message.includes('User already registered')) {
-             Toast.show({
-                type: 'error',
-                text1: 'Error',
-                text2: 'El correo electrónico ya está registrado'
-            });
+        if (signUpError.message.includes('User already registered')) {
+           Toast.show({ type: 'error', text1: 'Error', text2: 'El correo electrónico ya está registrado' });
          } else {
-            Toast.show({
-                type: 'error',
-                text1: 'Error al registrar usuario',
-                text2: signUpError.message
-            });
+           Toast.show({ type: 'error', text1: 'Error al registrar usuario', text2: signUpError.message });
          }
-        setLoading(false); // Asegurarse de parar el loading
-        return; // Salir si hay error en signUp
+        setLoading(false);
+        return;
       }
-      
-      // Verificar si authData o authData.user es null (importante)
-       if (!authData || !authData.user) {
-          Toast.show({
-            type: 'error',
-            text1: 'Error',
-            text2: 'No se pudo obtener la información del usuario tras el registro.'
-          });
+
+      if (!authData || !authData.user) {
+          Toast.show({ type: 'error', text1: 'Error', text2: 'No se pudo obtener la información del usuario tras el registro.' });
           setLoading(false);
-          // Podríamos considerar aquí llamar a una función para eliminar el usuario de auth si se creó
           return;
        }
+       createdUserId = authData.user.id;
 
-
-      // 2. Insertar perfil en la tabla 'users' usando el ID de Supabase Auth
-      const { error: profileError } = await supabase
+      // 2. Insert into 'users' table with role 'limpiador'
+      const { error: userInsertError } = await supabase
         .from('users')
         .insert([
-          { 
-            id: authData.user.id, // Usar el ID del usuario autenticado
+          {
+            id: authData.user.id,
             email: formData.email, 
             full_name: formData.fullName,
             phone_number: formData.phone,
-            role: 'employee' // Asegurar que sea 'employee'
+            role: 'limpiador'
+          }
+        ]);
+
+      if (userInsertError) {
+          console.error("Error inserting into users table (employee):", userInsertError);
+          Toast.show({ type: 'error', text1: 'Error', text2: 'Error al guardar datos de empleado.' });
+          // Consider cleanup logic here
+          setLoading(false);
+          return;
+      }
+
+      // 3. Create employee profile (if you have an 'employee_profiles' table)
+      // If not, this step can be skipped or adapted.
+      /*
+      const { error: profileError } = await supabase
+        .from('employee_profiles') // Assuming this table exists
+        .insert([
+          {
+            user_id: authData.user.id,
+            // Add default employee profile fields like skills, availability, etc.
+            skills: [], 
+            availability: 'available',
           }
         ]);
 
       if (profileError) {
-         // Si falla la creación del perfil, informar al usuario.
-         // Idealmente, se podría intentar borrar el usuario de auth.users para consistencia,
-         // pero por ahora solo mostraremos el error.
-        Toast.show({
-            type: 'error',
-            text1: 'Error al crear perfil',
-            // Podríamos querer mostrar un mensaje más genérico al usuario final
-            text2: profileError.message 
-          });
-        // No necesariamente retornamos aquí, el usuario está registrado pero sin perfil completo.
-        // Depende de la lógica de negocio qué hacer. Por ahora, dejaremos que continúe
-        // pero el login podría fallar si depende de la tabla 'users'.
-         console.error("Error creating user profile:", profileError);
-         // Considerar return aquí si el perfil es absolutamente necesario para continuar
-         // return; 
+         console.error("Error inserting into employee_profiles:", profileError);
+         Toast.show({ type: 'error', text1: 'Error', text2: 'Error al crear el perfil de empleado.' });
+         // Consider cleanup logic here
+         setLoading(false);
+         return;
       }
+      */
 
-      // Éxito
       Toast.show({
         type: 'success',
-        text1: 'Éxito',
-        text2: 'Cuenta de empleado creada correctamente. Revisa tu email para confirmar.' // Ajustar si la confirmación está habilitada
+        text1: '¡Registro Exitoso!',
+        text2: 'Revisa tu email para confirmar y luego inicia sesión.'
       });
-      
-      // Limpiar AsyncStorage si ya no es necesario
-      // await AsyncStorage.removeItem('userRole');
-      // await AsyncStorage.removeItem('userId');
-      // await AsyncStorage.removeItem('userFullName');
 
-
-      // No es necesario iniciar sesión aquí, el usuario ya está "logueado" tras signUp
-      // Pero sí redirigimos
-      // router.replace('/(employee)/'); // Ajustar la ruta si es necesario
+      // Redirigir a la pantalla de inicio de sesión
+      router.push('/(auth)/auth');
 
     } catch (error) {
+      console.error("Unexpected employee signup error:", error);
       Toast.show({
         type: 'error',
         text1: 'Error inesperado',
         text2: error instanceof Error ? error.message : 'Ocurrió un error desconocido'
       });
+       // Consider cleanup logic for createdUserId if needed
     } finally {
-      setLoading(false); // Asegurar que loading se desactive siempre
+      setLoading(false);
     }
   };
 
-  // Nueva función para manejar el botón atrás
   const handleBackPress = () => {
     if (router.canGoBack()) {
       router.back();
     } else {
-      // Si no se puede volver, ir a la pantalla inicial
       router.replace('/'); 
     }
   };
@@ -203,6 +176,7 @@ export default function EmployeeSignup() {
           <ArrowLeft size={24} color={theme.colors.surface} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Registro de Empleado</Text>
+        <View style={styles.headerPlaceholder} />
       </View>
       <ScrollView 
         style={styles.scrollView}
@@ -213,14 +187,15 @@ export default function EmployeeSignup() {
           <View style={styles.inputContainer}>
             <Text style={styles.label}>Nombre completo</Text>
             <View style={styles.inputWrapper}>
-              <User size={20} color={theme.colors.text.light} style={styles.inputIcon} />
+              <User size={20} color={theme.colors.text.placeholder} style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
                 placeholder="Tu nombre completo"
                 value={formData.fullName}
                 onChangeText={(value) => handleChange('fullName', value)}
                 autoCapitalize="words"
-                placeholderTextColor={theme.colors.text.light}
+                placeholderTextColor={theme.colors.text.placeholder}
+                editable={!loading}
               />
             </View>
           </View>
@@ -228,7 +203,7 @@ export default function EmployeeSignup() {
           <View style={styles.inputContainer}>
             <Text style={styles.label}>Correo electrónico</Text>
             <View style={styles.inputWrapper}>
-              <Mail size={20} color={theme.colors.text.light} style={styles.inputIcon} />
+              <Mail size={20} color={theme.colors.text.placeholder} style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
                 placeholder="tu@email.com"
@@ -236,7 +211,8 @@ export default function EmployeeSignup() {
                 onChangeText={(value) => handleChange('email', value)}
                 keyboardType="email-address"
                 autoCapitalize="none"
-                placeholderTextColor={theme.colors.text.light}
+                placeholderTextColor={theme.colors.text.placeholder}
+                editable={!loading}
               />
             </View>
           </View>
@@ -244,14 +220,15 @@ export default function EmployeeSignup() {
           <View style={styles.inputContainer}>
             <Text style={styles.label}>Teléfono</Text>
             <View style={styles.inputWrapper}>
-              <Phone size={20} color={theme.colors.text.light} style={styles.inputIcon} />
+              <Phone size={20} color={theme.colors.text.placeholder} style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
-                placeholder="Tu número de teléfono"
+                placeholder="Ej: 04121234567"
                 value={formData.phone}
                 onChangeText={(value) => handleChange('phone', value)}
                 keyboardType="phone-pad"
-                placeholderTextColor={theme.colors.text.light}
+                placeholderTextColor={theme.colors.text.placeholder}
+                editable={!loading}
               />
             </View>
           </View>
@@ -259,14 +236,15 @@ export default function EmployeeSignup() {
           <View style={styles.inputContainer}>
             <Text style={styles.label}>Contraseña</Text>
             <View style={styles.inputWrapper}>
-              <Lock size={20} color={theme.colors.text.light} style={styles.inputIcon} />
+              <Lock size={20} color={theme.colors.text.placeholder} style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
-                placeholder="Tu contraseña"
+                placeholder="Mínimo 6 caracteres"
                 value={formData.password}
                 onChangeText={(value) => handleChange('password', value)}
                 secureTextEntry
-                placeholderTextColor={theme.colors.text.light}
+                placeholderTextColor={theme.colors.text.placeholder}
+                editable={!loading}
               />
             </View>
           </View>
@@ -274,110 +252,112 @@ export default function EmployeeSignup() {
           <View style={styles.inputContainer}>
             <Text style={styles.label}>Confirmar contraseña</Text>
             <View style={styles.inputWrapper}>
-              <Lock size={20} color={theme.colors.text.light} style={styles.inputIcon} />
+              <Lock size={20} color={theme.colors.text.placeholder} style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
-                placeholder="Confirma tu contraseña"
+                placeholder="Repite tu contraseña"
                 value={formData.confirmPassword}
                 onChangeText={(value) => handleChange('confirmPassword', value)}
                 secureTextEntry
-                placeholderTextColor={theme.colors.text.light}
+                placeholderTextColor={theme.colors.text.placeholder}
+                editable={!loading}
               />
             </View>
           </View>
         </View>
 
         <TouchableOpacity 
-          style={[styles.button, loading && styles.buttonDisabled]}
-          onPress={handleSubmit}
-          activeOpacity={0.8}
-          disabled={loading}
+           style={[styles.button, loading && styles.buttonDisabled]} 
+           onPress={handleSubmit}
+           disabled={loading}
         >
-          <Text style={styles.buttonText}>
-            {loading ? 'Registrando...' : 'Registrarse'}
-          </Text>
+          {loading ? (
+            <ActivityIndicator color={theme.colors.surface} />
+          ) : (
+            <Text style={styles.buttonText}>Crear Cuenta de Empleado</Text>
+          )}
         </TouchableOpacity>
+
       </ScrollView>
       <Toast />
     </KeyboardAvoidingView>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
+const getStyles = (theme) => StyleSheet.create({
+   container: {
     flex: 1,
-    backgroundColor: theme.colors.background,
+    backgroundColor: theme.colors.background, 
   },
   header: {
-    backgroundColor: theme.colors.primary,
-    padding: theme.spacing.xl,
-    paddingTop: Platform.OS === 'android' ? theme.spacing.xl + 10 : 48,
+    backgroundColor: theme.colors.primary, 
+    paddingHorizontal: theme.spacing.lg,
+    paddingTop: Platform.OS === 'android' ? theme.spacing.xl + 10 : 50,
+    paddingBottom: theme.spacing.md,
     flexDirection: 'row',
     alignItems: 'center',
-    borderBottomLeftRadius: theme.borderRadius.xl,
-    borderBottomRightRadius: theme.borderRadius.xl,
-    ...theme.shadows.lg,
+    justifyContent: 'space-between',
   },
   backButton: {
-    padding: theme.spacing.sm,
-    marginRight: theme.spacing.md,
+    padding: theme.spacing.xs,
   },
   headerTitle: {
     ...theme.typography.h2,
-    color: theme.colors.surface,
+    color: theme.colors.surface, 
+    textAlign: 'center',
+    flex: 1,
+  },
+  headerPlaceholder: {
+    width: 24 + theme.spacing.xs * 2, 
   },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
-    padding: theme.spacing.xl,
-    paddingBottom: theme.spacing.xl * 2,
+    padding: theme.spacing.lg,
+    paddingBottom: theme.spacing.xxl,
   },
   form: {
-    gap: theme.spacing.lg,
-    marginBottom: theme.spacing.xl,
+    marginBottom: theme.spacing.xl, 
   },
   inputContainer: {
-    gap: theme.spacing.sm,
+    marginBottom: theme.spacing.md,
   },
   label: {
-    ...theme.typography.caption,
-    color: theme.colors.text.primary,
-    fontWeight: '500',
+    ...theme.typography.label,
+    color: theme.colors.text.secondary, 
+    marginBottom: theme.spacing.xs,
   },
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: theme.colors.surface,
+    backgroundColor: theme.colors.surfaceVariant, 
     borderRadius: theme.borderRadius.md,
     borderWidth: 1,
-    borderColor: theme.colors.border,
-    ...theme.shadows.sm,
+    borderColor: theme.colors.border, 
+    paddingHorizontal: theme.spacing.md,
   },
   inputIcon: {
-    marginHorizontal: theme.spacing.md,
+    marginRight: theme.spacing.sm,
   },
   input: {
     flex: 1,
-    paddingVertical: theme.spacing.lg,
-    paddingRight: theme.spacing.lg,
-    ...theme.typography.body,
-    color: theme.colors.text.primary,
+    height: 50,
+    color: theme.colors.text.primary, 
+    ...theme.typography.body1,
   },
   button: {
-    backgroundColor: theme.colors.primary,
+    backgroundColor: theme.colors.primary, 
     paddingVertical: theme.spacing.lg,
-    paddingHorizontal: theme.spacing.xl,
     borderRadius: theme.borderRadius.lg,
     alignItems: 'center',
     ...theme.shadows.md,
-    marginTop: theme.spacing.md,
   },
   buttonDisabled: {
-    opacity: 0.7,
+     backgroundColor: theme.colors.primary + '80',
   },
   buttonText: {
     ...theme.typography.button,
-    color: theme.colors.surface,
+    color: theme.colors.surface, 
   },
 });

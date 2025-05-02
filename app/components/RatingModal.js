@@ -1,21 +1,25 @@
 import React, { useState, useEffect } from 'react';
 import { Modal, View, Text, StyleSheet, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
 import { Star, X } from 'lucide-react-native';
-import { theme } from '../theme'; // Ajusta la ruta si es necesario
+// import { theme } from '../theme'; // Remove direct import
+import { useTheme } from '../../constants/ThemeContext'; // Import useTheme (adjust path if needed)
 
-const RatingModal = ({ isVisible, onClose, onSubmit, bookingServiceName }) => {
+const RatingModal = ({ visible, onClose, onSubmit, bookingServiceName }) => { // Renamed isVisible to visible for clarity
+  const { theme } = useTheme(); // Use theme hook
+  const styles = getStyles(theme); // Get styles from theme
+
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Reset state when modal opens
+  // Reset state when modal becomes visible
   useEffect(() => {
-    if (isVisible) {
+    if (visible) {
       setRating(0);
       setComment('');
       setIsSubmitting(false);
     }
-  }, [isVisible]);
+  }, [visible]);
 
   const handleRating = (rate) => {
     setRating(rate);
@@ -23,18 +27,17 @@ const RatingModal = ({ isVisible, onClose, onSubmit, bookingServiceName }) => {
 
   const handleSubmit = async () => {
     if (rating === 0) {
-      alert('Por favor, selecciona una calificación (1-5 estrellas).'); // Simple alert
+      alert('Por favor, selecciona una calificación (1-5 estrellas).');
       return;
     }
     setIsSubmitting(true);
     try {
-      await onSubmit(rating, comment); // Llama a la función pasada por props
-      // El cierre del modal y el toast de éxito/error se manejan en el componente padre (BookingDetail)
+      await onSubmit(rating, comment);
+      // Parent component handles closing and success/error toasts
     } catch (error) {
-      // El error ya se maneja en el componente padre
-      console.log("Error caught in modal, but handled by parent", error);
+      console.log("Error submitting rating (handled by parent):", error);
     } finally {
-      setIsSubmitting(false);
+      setIsSubmitting(false); // Ensure loading state is reset
     }
   };
 
@@ -42,68 +45,66 @@ const RatingModal = ({ isVisible, onClose, onSubmit, bookingServiceName }) => {
     <Modal
       animationType="slide"
       transparent={true}
-      visible={isVisible}
-      onRequestClose={onClose} // Para botón de retroceso en Android
+      visible={visible}
+      onRequestClose={onClose}
     >
       <KeyboardAvoidingView 
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={styles.keyboardAvoidingView}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContainer}>
-            <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-              <X size={24} color={theme.colors.text.secondary} />
-            </TouchableOpacity>
-            
-            <Text style={styles.modalTitle}>Califica {bookingServiceName}</Text>
-
-            {/* Selector de Estrellas */}
-            <View style={styles.starsContainer}>
-              {[1, 2, 3, 4, 5].map((star) => (
-                <TouchableOpacity key={star} onPress={() => handleRating(star)} activeOpacity={0.7}>
-                  <Star 
-                    size={40} 
-                    color={star <= rating ? theme.colors.warning : theme.colors.border} 
-                    fill={star <= rating ? theme.colors.warning : 'none'} 
-                  />
+        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={onClose}>
+             <TouchableOpacity style={styles.modalContainer} activeOpacity={1} onPress={(e) => e.stopPropagation()}>
+                <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+                  <X size={24} color={theme.colors.text.secondary} />
                 </TouchableOpacity>
-              ))}
-            </View>
+                
+                <Text style={styles.modalTitle}>Califica "{bookingServiceName || 'el servicio'}"</Text>
 
-            {/* Comentario */}
-            <Text style={styles.commentLabel}>Añadir un comentario (opcional):</Text>
-            <TextInput
-              style={styles.commentInput}
-              multiline
-              numberOfLines={4}
-              placeholder="Describe tu experiencia..."
-              placeholderTextColor={theme.colors.text.hint}
-              value={comment}
-              onChangeText={setComment}
-            />
+                <View style={styles.starsContainer}>
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <TouchableOpacity key={star} onPress={() => handleRating(star)} activeOpacity={0.7}>
+                      <Star 
+                        size={40} 
+                        color={star <= rating ? theme.colors.warning : theme.colors.border} 
+                        fill={star <= rating ? theme.colors.warning : 'none'} // Use theme colors
+                      />
+                    </TouchableOpacity>
+                  ))}
+                </View>
 
-            {/* Botón de Envío */}
-            <TouchableOpacity 
-              style={[styles.submitButton, isSubmitting && styles.submitButtonDisabled]}
-              onPress={handleSubmit}
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? (
-                  <ActivityIndicator color={theme.colors.white} />
-              ) : (
-                 <Text style={styles.submitButtonText}>Enviar Calificación</Text>
-              )}
-             
+                <Text style={styles.commentLabel}>Añadir un comentario (opcional):</Text>
+                <TextInput
+                  style={styles.commentInput}
+                  multiline
+                  numberOfLines={4}
+                  placeholder="Describe tu experiencia..."
+                  placeholderTextColor={theme.colors.text.placeholder} // Use theme placeholder color
+                  value={comment}
+                  onChangeText={setComment}
+                  editable={!isSubmitting}
+                />
+
+                <TouchableOpacity 
+                  style={[styles.submitButton, isSubmitting && styles.submitButtonDisabled]}
+                  onPress={handleSubmit}
+                  disabled={isSubmitting || rating === 0} // Disable if no rating selected
+                >
+                  {isSubmitting ? (
+                      <ActivityIndicator color={theme.colors.surface} /> // Use surface color for loader
+                  ) : (
+                     <Text style={styles.submitButtonText}>Enviar Calificación</Text>
+                  )}
+                 
+                </TouchableOpacity>
             </TouchableOpacity>
-
-          </View>
-        </View>
+        </TouchableOpacity>
       </KeyboardAvoidingView>
     </Modal>
   );
 };
 
-const styles = StyleSheet.create({
+// Function to generate styles based on the theme
+const getStyles = (theme) => StyleSheet.create({
   keyboardAvoidingView: {
     flex: 1,
   },
@@ -111,26 +112,31 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)', // Semi-transparent background
+    padding: theme.spacing.md, // Add padding to avoid edges
   },
   modalContainer: {
-    width: '90%',
-    backgroundColor: theme.colors.surface,
+    width: '100%', // Take full width within padding
+    maxWidth: 400, // Max width for larger screens
+    backgroundColor: theme.colors.surface, // Use theme surface color
     borderRadius: theme.borderRadius.xl,
     padding: theme.spacing.xl,
     alignItems: 'center',
-    ...theme.shadows.lg,
+    ...theme.shadows.lg, // Use theme shadow
   },
   closeButton: {
     position: 'absolute',
     top: theme.spacing.md,
     right: theme.spacing.md,
+    padding: theme.spacing.xs, // Add padding for easier tap
+    zIndex: 1, // Ensure it's above other elements
   },
   modalTitle: {
     ...theme.typography.h2,
-    color: theme.colors.text.primary,
+    color: theme.colors.text.primary, // Use theme text color
     marginBottom: theme.spacing.lg,
     textAlign: 'center',
+    paddingHorizontal: theme.spacing.lg, // Ensure title doesn't overlap close button
   },
   starsContainer: {
     flexDirection: 'row',
@@ -140,26 +146,27 @@ const styles = StyleSheet.create({
   },
   commentLabel: {
     ...theme.typography.label,
-    color: theme.colors.text.secondary,
+    color: theme.colors.text.secondary, // Use theme text color
     alignSelf: 'flex-start',
     marginBottom: theme.spacing.sm,
   },
   commentInput: {
     width: '100%',
-    height: 100,
-    backgroundColor: theme.colors.background,
+    minHeight: 100, // Use minHeight
+    backgroundColor: theme.colors.surfaceVariant, // Use theme color
     borderRadius: theme.borderRadius.md,
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: theme.colors.border, // Use theme border color
     paddingHorizontal: theme.spacing.md,
-    paddingTop: theme.spacing.md, // Para que el texto empiece arriba en multiline
+    paddingTop: theme.spacing.md,
+    paddingBottom: theme.spacing.md,
     marginBottom: theme.spacing.xl,
-    textAlignVertical: 'top', // Para Android
-    ...theme.typography.body,
-    color: theme.colors.text.primary,
+    textAlignVertical: 'top',
+    ...theme.typography.body1,
+    color: theme.colors.text.primary, // Use theme text color
   },
   submitButton: {
-    backgroundColor: theme.colors.primary,
+    backgroundColor: theme.colors.primary, // Use theme primary color
     paddingVertical: theme.spacing.lg,
     paddingHorizontal: theme.spacing.xl,
     borderRadius: theme.borderRadius.lg,
@@ -168,12 +175,12 @@ const styles = StyleSheet.create({
     ...theme.shadows.md,
   },
    submitButtonDisabled: {
-       backgroundColor: theme.colors.disabled, // Color más apagado
+       backgroundColor: theme.colors.primary + '80', // Use theme disabled style (alpha)
+       opacity: 0.7,
    },
   submitButtonText: {
     ...theme.typography.button,
-    color: theme.colors.white,
-    fontWeight: 'bold',
+    color: theme.colors.surface, // Use theme surface color (text on primary)
   },
 });
 

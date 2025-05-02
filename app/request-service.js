@@ -13,12 +13,15 @@ import { useRouter } from 'expo-router';
 import { ArrowLeft, Calendar, Clock, MapPin, FileText } from 'lucide-react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { supabase } from '../lib/supabase'; // Asegúrate que la ruta sea correcta
-import { theme } from './theme'; // Asegúrate que la ruta sea correcta
+import { useTheme } from '../constants/ThemeContext'; // Import useTheme
 import Toast from 'react-native-toast-message';
 import { Picker } from '@react-native-picker/picker'; 
 
 export default function RequestServiceScreen() {
   const router = useRouter();
+  const { theme } = useTheme(); // Use theme hook
+  const styles = getStyles(theme); // Get styles from theme
+
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [services, setServices] = useState([]);
@@ -196,15 +199,18 @@ export default function RequestServiceScreen() {
                   selectedValue={selectedServiceId}
                   onValueChange={(itemValue) => setSelectedServiceId(itemValue)}
                   style={styles.picker}
+                  itemStyle={styles.pickerItem}
+                  dropdownIconColor={theme.colors.text.secondary}
                   mode="dropdown"
                   enabled={!submitting}
                 >
-                  <Picker.Item label="-- Selecciona un paquete --" value={null} />
+                   <Picker.Item label="-- Selecciona un paquete --" value={null} style={styles.pickerItemPlaceholder} />
                   {services.map(service => (
                     <Picker.Item 
                       key={service.id} 
                       label={`${service.name} ($${service.base_price})`}
                       value={service.id} 
+                      style={styles.pickerItem}
                     />
                   ))}
                 </Picker>
@@ -214,14 +220,14 @@ export default function RequestServiceScreen() {
           <View style={styles.section}>
              <View style={styles.sectionHeader}>
                <Text style={styles.sectionTitle}>Dirección de Limpieza</Text>
-                <TouchableOpacity onPress={() => router.push('/(tabs)/locations')}>
+                <TouchableOpacity onPress={() => router.push('/(tabs)/locations')} disabled={submitting}>
                     <Text style={styles.manageLocationsText}>Gestionar</Text>
                 </TouchableOpacity>
              </View>
              {locations.length === 0 ? (
                 <View style={styles.noLocations}>
                     <Text style={styles.noLocationsText}>No tienes ubicaciones guardadas.</Text>
-                    <TouchableOpacity onPress={() => router.push('/location-form')}>
+                    <TouchableOpacity onPress={() => router.push('location-form')} disabled={submitting}>
                         <Text style={styles.addLocationLink}>Añadir Ubicación</Text>
                     </TouchableOpacity>
                 </View>
@@ -231,15 +237,18 @@ export default function RequestServiceScreen() {
                     selectedValue={selectedLocationId}
                     onValueChange={(itemValue) => setSelectedLocationId(itemValue)}
                     style={styles.picker}
+                    itemStyle={styles.pickerItem}
+                    dropdownIconColor={theme.colors.text.secondary}
                     mode="dropdown"
                     enabled={!submitting} 
                   >
-                     <Picker.Item label="-- Selecciona una ubicación --" value={null} />
+                     <Picker.Item label="-- Selecciona una ubicación --" value={null} style={styles.pickerItemPlaceholder} />
                     {locations.map(loc => (
                       <Picker.Item 
                         key={loc.id} 
                         label={loc.nickname ? `${loc.nickname} (${loc.address_line1})` : `${loc.address_line1}${loc.address_line2 ? ', '+loc.address_line2 : ''}`} 
                         value={loc.id} 
+                        style={styles.pickerItem}
                       />
                     ))}
                   </Picker>
@@ -249,44 +258,45 @@ export default function RequestServiceScreen() {
 
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Frecuencia</Text>
-            <View style={styles.pickerWrapper}>
+             <View style={styles.pickerWrapper}> 
                <Picker
-                  selectedValue={frequency}
-                  onValueChange={(itemValue) => setFrequency(itemValue)}
-                  style={styles.picker}
-                  mode="dropdown"
-                  enabled={!submitting} 
-                >
-                  <Picker.Item label="Una Vez" value="una_vez" />
-                  <Picker.Item label="Semanal" value="semanal" />
-                  <Picker.Item label="Quincenal" value="quincenal" />
-                  <Picker.Item label="Mensual" value="mensual" />
-                </Picker>
+                 selectedValue={frequency}
+                 onValueChange={(itemValue) => setFrequency(itemValue)}
+                 style={styles.picker}
+                 itemStyle={styles.pickerItem}
+                 dropdownIconColor={theme.colors.text.secondary}
+                 mode="dropdown"
+                 enabled={!submitting}
+               >
+                 <Picker.Item label="Solo una vez" value="una_vez" style={styles.pickerItem} />
+                 <Picker.Item label="Semanal" value="semanal" style={styles.pickerItem} />
+                 <Picker.Item label="Cada 2 semanas" value="quincenal" style={styles.pickerItem} />
+                 <Picker.Item label="Mensual" value="mensual" style={styles.pickerItem} />
+               </Picker>
             </View>
           </View>
 
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Fecha y Hora</Text>
-            <View style={styles.dateTimeRow}>
-               <TouchableOpacity style={[styles.dateButton, submitting && styles.disabledLook]} onPress={() => !submitting && setShowDatePicker(true)} disabled={submitting}>
-                  <Calendar size={20} color={theme.colors.primary} />
-                  <Text style={styles.dateButtonText}>{formatDate(date)}</Text>
-               </TouchableOpacity>
-               <TouchableOpacity style={[styles.dateButton, submitting && styles.disabledLook]} onPress={() => !submitting && setShowTimePicker(true)} disabled={submitting}>
-                  <Clock size={20} color={theme.colors.primary} />
-                  <Text style={styles.dateButtonText}>{formatTime(date)}</Text>
-               </TouchableOpacity>
+            <View style={styles.dateTimeContainer}>
+              <TouchableOpacity onPress={() => setShowDatePicker(true)} style={styles.dateTouchable} disabled={submitting}>
+                <Calendar size={20} color={theme.colors.text.secondary} />
+                <Text style={styles.dateText}>{formatDate(date)}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => setShowTimePicker(true)} style={styles.dateTouchable} disabled={submitting}>
+                <Clock size={20} color={theme.colors.text.secondary} />
+                <Text style={styles.dateText}>{formatTime(date)}</Text>
+              </TouchableOpacity>
             </View>
-           
+
             {showDatePicker && (
               <DateTimePicker
                 testID="datePicker"
                 value={date}
                 mode="date"
-                is24Hour={false}
                 display="default"
                 onChange={onChangeDate}
-                minimumDate={new Date()} 
+                minimumDate={new Date()}
               />
             )}
             {showTimePicker && (
@@ -294,39 +304,36 @@ export default function RequestServiceScreen() {
                 testID="timePicker"
                 value={date}
                 mode="time"
-                is24Hour={false}
                 display="default"
                 onChange={onChangeTime}
+                 minuteInterval={15}
               />
             )}
           </View>
 
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Instrucciones Especiales (Opcional)</Text>
-            <View style={styles.inputWrapper}>
-              <FileText size={20} color={theme.colors.text.light} style={styles.inputIcon} />
-              <TextInput
-                style={[styles.input, styles.textArea, submitting && styles.disabledLook]}
-                placeholder="Ej: Enfocarse en la cocina, tengo un perro..."
-                value={instructions}
-                onChangeText={setInstructions}
-                placeholderTextColor={theme.colors.text.light}
-                multiline
-                numberOfLines={4}
-                editable={!submitting}
-              />
-            </View>
+            <TextInput
+              style={styles.textArea}
+              placeholder="Ej: Tocar el timbre azul, tengo perro pero es amigable..."
+              value={instructions}
+              onChangeText={setInstructions}
+              multiline={true}
+              numberOfLines={4}
+              placeholderTextColor={theme.colors.text.placeholder}
+              editable={!submitting}
+            />
           </View>
 
           <TouchableOpacity 
-            style={[styles.submitButton, submitting && styles.submitButtonDisabled]} 
-            onPress={handleSubmit}
-            disabled={submitting || locations.length === 0}
+            style={[styles.submitButton, submitting && styles.submitButtonDisabled]}
+            onPress={handleSubmit} 
+            disabled={submitting}
           >
             {submitting ? (
               <ActivityIndicator color={theme.colors.surface} />
             ) : (
-              <Text style={styles.submitButtonText}>Solicitar Servicio</Text>
+              <Text style={styles.submitButtonText}>Confirmar Solicitud</Text>
             )}
           </TouchableOpacity>
         </>
@@ -336,141 +343,10 @@ export default function RequestServiceScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (theme) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: theme.colors.background,
-  },
-   header: {
-    backgroundColor: theme.colors.surface,
-    padding: theme.spacing.lg,
-    paddingTop: Platform.OS === 'android' ? theme.spacing.xl + 10 : 48, 
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
-  },
-  backButton: {
-    padding: theme.spacing.sm,
-    marginRight: theme.spacing.md,
-  },
-  headerTitle: {
-    ...theme.typography.h2,
-    color: theme.colors.text.primary,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-     padding: theme.spacing.lg,
-     paddingBottom: theme.spacing.xl * 2,
-  },
-  section: {
-    marginBottom: theme.spacing.xl,
-  },
-  sectionHeader: {
-       flexDirection: 'row',
-       justifyContent: 'space-between',
-       alignItems: 'center',
-       marginBottom: theme.spacing.md,
-   },
-  sectionTitle: {
-    ...theme.typography.h3,
-    color: theme.colors.text.primary,
-  },
-  manageLocationsText: {
-       ...theme.typography.link,
-       color: theme.colors.primary,
-       fontWeight: '500',
-   },
-   noLocations: {
-       alignItems: 'center',
-       paddingVertical: theme.spacing.lg,
-       backgroundColor: theme.colors.surface,
-       borderRadius: theme.borderRadius.md,
-       borderWidth: 1,
-       borderColor: theme.colors.border,
-   },
-   noLocationsText: {
-       ...theme.typography.body,
-       color: theme.colors.text.secondary,
-       marginBottom: theme.spacing.sm,
-   },
-   addLocationLink: {
-       ...theme.typography.link,
-       color: theme.colors.primary,
-       fontWeight: '600',
-   },
-  pickerWrapper: {
-    backgroundColor: theme.colors.surface,
-    borderRadius: theme.borderRadius.md,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-  },
-  picker: {
-    height: 50, 
-    width: '100%',
-    color: theme.colors.text.primary, 
-  },
-  dateTimeRow: {
-      flexDirection: 'row',
-      gap: theme.spacing.md,
-  },
-   dateButton: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      backgroundColor: theme.colors.surface,
-      paddingVertical: theme.spacing.md,
-      paddingHorizontal: theme.spacing.lg,
-      borderRadius: theme.borderRadius.md,
-      borderWidth: 1,
-      borderColor: theme.colors.border,
-      gap: theme.spacing.sm,
-      flex: 1, 
-  },
-  dateButtonText: {
-    ...theme.typography.body,
-    color: theme.colors.text.primary,
-  },
-  inputWrapper: {
-    flexDirection: 'row',
-    backgroundColor: theme.colors.surface,
-    borderRadius: theme.borderRadius.md,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-  },
-  inputIcon: {
-    marginHorizontal: theme.spacing.md,
-     marginTop: theme.spacing.lg,
-  },
-  input: {
-    flex: 1,
-    paddingVertical: theme.spacing.lg,
-    paddingRight: theme.spacing.lg, 
-    ...theme.typography.body,
-    color: theme.colors.text.primary,
-  },
-  textArea: {
-      height: 100, 
-      textAlignVertical: 'top', 
-      paddingTop: theme.spacing.lg, 
-  },
-  submitButton: {
-    backgroundColor: theme.colors.primary,
-    paddingVertical: theme.spacing.lg,
-    paddingHorizontal: theme.spacing.xl,
-    borderRadius: theme.borderRadius.lg,
-    alignItems: 'center',
-    marginTop: theme.spacing.lg,
-    ...theme.shadows.md,
-  },
-  submitButtonDisabled: {
-    opacity: 0.7,
-    backgroundColor: theme.colors.primaryLight,
-  },
-  submitButtonText: {
-    ...theme.typography.button,
-    color: theme.colors.surface,
   },
   loadingContainer: {
      flex: 1,
@@ -478,13 +354,143 @@ const styles = StyleSheet.create({
      alignItems: 'center',
      backgroundColor: theme.colors.background,
   },
-   loadingText: {
-       marginTop: theme.spacing.md,
-       ...theme.typography.body,
-       color: theme.colors.text.secondary,
+  loadingText: {
+      marginTop: theme.spacing.md,
+      ...theme.typography.body,
+      color: theme.colors.text.secondary,
+  },
+  header: {
+    backgroundColor: theme.colors.surface,
+    paddingHorizontal: theme.spacing.lg,
+    paddingTop: Platform.OS === 'android' ? theme.spacing.xl + 10 : 48, 
+    paddingBottom: theme.spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
+  },
+  backButton: {
+    padding: theme.spacing.sm,
+  },
+  headerTitle: {
+    ...theme.typography.h2,
+    color: theme.colors.text.primary,
+    textAlign: 'center',
+    flex: 1,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+     padding: theme.spacing.lg,
+     paddingBottom: theme.spacing.xxl,
+  },
+  section: {
+    marginBottom: theme.spacing.lg,
+  },
+  sectionTitle: {
+    ...theme.typography.h3,
+    color: theme.colors.text.primary,
+    marginBottom: theme.spacing.md,
+  },
+  pickerWrapper: {
+    backgroundColor: theme.colors.surfaceVariant,
+    borderRadius: theme.borderRadius.md,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    overflow: 'hidden',
+  },
+  picker: {
+    width: '100%',
+    height: Platform.OS === 'ios' ? undefined : 50,
+    color: theme.colors.text.primary,
+    backgroundColor: Platform.OS === 'ios' ? theme.colors.surfaceVariant : undefined,
+  },
+   pickerItem: {
+     color: theme.colors.text.primary, 
    },
-   disabledLook: {
-       opacity: 0.6,
-       backgroundColor: theme.colors.border,
+    pickerItemPlaceholder: {
+     color: theme.colors.text.placeholder,
    },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: theme.spacing.md,
+  },
+  manageLocationsText: {
+      ...theme.typography.link,
+      color: theme.colors.primary,
+  },
+  noLocations: {
+      backgroundColor: theme.colors.surfaceVariant,
+      padding: theme.spacing.md,
+      borderRadius: theme.borderRadius.md,
+      alignItems: 'center',
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      borderStyle: 'dashed',
+  },
+  noLocationsText: {
+      ...theme.typography.body2,
+      color: theme.colors.text.secondary,
+      marginBottom: theme.spacing.sm,
+      textAlign: 'center',
+  },
+  addLocationLink: {
+      ...theme.typography.link,
+      color: theme.colors.primary,
+      fontWeight: 'bold',
+  },
+  dateTimeContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: theme.spacing.md,
+    marginBottom: theme.spacing.md,
+  },
+  dateTouchable: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.colors.surfaceVariant,
+    paddingVertical: theme.spacing.md,
+    paddingHorizontal: theme.spacing.lg,
+    borderRadius: theme.borderRadius.md,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    flex: 1,
+    justifyContent: 'center',
+    gap: theme.spacing.sm,
+  },
+  dateText: {
+    ...theme.typography.body1,
+    color: theme.colors.text.primary,
+  },
+  textArea: {
+    backgroundColor: theme.colors.surfaceVariant,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.md,
+    borderRadius: theme.borderRadius.md,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    color: theme.colors.text.primary,
+    minHeight: 100,
+    textAlignVertical: 'top',
+     ...theme.typography.body1,
+  },
+  submitButton: {
+    backgroundColor: theme.colors.primary,
+    paddingVertical: theme.spacing.lg,
+    borderRadius: theme.borderRadius.lg,
+    alignItems: 'center',
+    marginTop: theme.spacing.lg,
+    ...theme.shadows.md,
+  },
+  submitButtonDisabled: {
+     backgroundColor: theme.colors.primary + '80',
+  },
+  submitButtonText: {
+    ...theme.typography.button,
+    color: theme.colors.surface,
+  },
 }); 

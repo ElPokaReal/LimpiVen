@@ -2,33 +2,32 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Platform, RefreshControl } from 'react-native';
 import { Clock, MapPin, Plus } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
-import { theme } from '../theme';
+import { useTheme } from '../../constants/ThemeContext';
 import { supabase } from '../../lib/supabase';
 import Toast from 'react-native-toast-message';
 
 export default function BookingsScreen() {
   const router = useRouter();
+  const { theme } = useTheme();
+  const styles = getStyles(theme);
+
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  // Función reutilizable para cargar las reservas
   const fetchBookings = useCallback(async () => {
-    setLoading(true); // Mostrar loader al cargar/refrescar inicialmente
+    setLoading(!refreshing);
     try {
-      // 1. Obtener usuario de Supabase Auth
       const { data: { user }, error: userError } = await supabase.auth.getUser();
 
       if (userError || !user) {
         Toast.show({ type: 'error', text1: 'Error', text2: 'No autenticado. Inicia sesión.' });
-        router.replace('/auth'); // Asegúrate que la ruta de login sea correcta
+        router.replace('/(auth)/auth');
         return;
       }
 
-      // Log para verificar el ID obtenido
       console.log('Usuario autenticado en BookingsScreen:', user.id);
 
-      // 2. Obtener reservas del usuario usando user.id
       const { data: bookingsData, error: bookingsError } = await supabase
         .from('bookings')
         .select(`
@@ -38,16 +37,15 @@ export default function BookingsScreen() {
           services ( name ),
           location:user_locations (
             address_line1,
-            address_line2
+            address_line2,
+            nickname
           )
         `)
-        .eq('client_id', user.id) // <- Usar user.id directamente
+        .eq('client_id', user.id)
         .order('scheduled_date', { ascending: false });
 
       if (bookingsError) {
-          // Log específico del error de Supabase
           console.error("Supabase bookings fetch error:", bookingsError);
-          // Revisar si es un error RLS (puede que no siempre sea explícito)
           if (bookingsError.message.includes("security policy")) {
               Toast.show({
                   type: 'error',
@@ -55,11 +53,10 @@ export default function BookingsScreen() {
                   text2: 'Verifica las políticas de seguridad para reservas.'
               });
           } else {
-              throw bookingsError; // Lanzar otros errores para el catch general
+              throw bookingsError;
           }
-          setBookings([]); // Dejar lista vacía si hay error
+          setBookings([]);
       } else {
-         // Log para ver qué datos se reciben
          console.log('Bookings data received:', bookingsData);
          setBookings(bookingsData || []);
       }
@@ -74,20 +71,17 @@ export default function BookingsScreen() {
       setBookings([]);
     } finally {
       setLoading(false);
-      setRefreshing(false); // Asegurarse que refreshing termine aquí también
+      setRefreshing(false);
     }
-  }, [router]); // Incluir router como dependencia si se usa para redirección
+  }, [router, refreshing]);
 
-  // Carga inicial
   useEffect(() => {
     fetchBookings();
-  }, [fetchBookings]); // fetchBookings es ahora la dependencia
+  }, [fetchBookings]);
 
-  // Función para el RefreshControl
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    fetchBookings(); // Llama a la misma función de carga
-  }, [fetchBookings]); // Dependencia de fetchBookings
+  }, []);
 
   const handleRequestService = () => {
     router.push('/request-service');
@@ -104,20 +98,14 @@ export default function BookingsScreen() {
     }
   };
   
-  const getStatusStyle = (status) => {
+  const getStatusInfo = (status) => {
       switch (status) {
-          case 'pendiente':
-              return { badge: styles.pendingBadge, text: styles.pendingText, label: 'Pendiente' };
-          case 'confirmado':
-              return { badge: styles.confirmedBadge, text: styles.confirmedText, label: 'Confirmado' };
-          case 'en_progreso':
-               return { badge: styles.inProgressBadge, text: styles.inProgressText, label: 'En Progreso' };
-          case 'completado':
-              return { badge: styles.completedBadge, text: styles.completedText, label: 'Completado' };
-          case 'cancelado':
-              return { badge: styles.cancelledBadge, text: styles.cancelledText, label: 'Cancelado' };
-          default:
-              return { badge: styles.statusBadge, text: styles.statusText, label: status }; 
+          case 'pendiente': return { style: styles.pending, label: 'Pendiente' };
+          case 'confirmado': return { style: styles.confirmed, label: 'Confirmado' };
+          case 'en_progreso': return { style: styles.inProgress, label: 'En Progreso' };
+          case 'completado': return { style: styles.completed, label: 'Completado' };
+          case 'cancelado': return { style: styles.cancelled, label: 'Cancelado' };
+          default: return { style: styles.defaultStatus, label: status }; 
       }
   };
 
@@ -132,41 +120,44 @@ export default function BookingsScreen() {
 
         <ScrollView
          style={styles.container}
+         contentContainerStyle={styles.scrollContent}
           refreshControl={
-        <RefreshControl
-          refreshing={refreshing}
-          onRefresh={onRefresh}
-          colors={[theme.colors.primary]}
-          tintColor={theme.colors.primary}
-        />
-        }
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              colors={[theme.colors.primary]}
+              tintColor={theme.colors.primary}
+            />
+          }
         >
-            {loading ? (
+            {loading && !refreshing ? (
                 <ActivityIndicator size="large" color={theme.colors.primary} style={styles.loader} />
             ) : bookings.length === 0 ? (
                 <View style={styles.noBookingsContainer}>
                     <Text style={styles.noBookingsText}>Aún no tienes reservas.</Text>
+                     <TouchableOpacity onPress={handleRequestService} style={styles.requestButtonSmall}>
+                        <Text style={styles.requestButtonText}>Solicitar Servicio</Text>
+                    </TouchableOpacity>
                 </View>
             ) : (
                 <View style={styles.bookingsList}>
                 {bookings.map((booking) => {
-                    const statusInfo = getStatusStyle(booking.status);
+                    const statusInfo = getStatusInfo(booking.status);
                     const serviceName = booking.services?.name || 'Servicio Desconocido';
+                    const locationName = booking.location?.nickname ? `${booking.location.nickname} (${booking.location.address_line1})` 
+                                       : booking.location ? booking.location.address_line1 : 'Ubicación no especificada';
                     
                     return (
                         <TouchableOpacity 
                             key={booking.id} 
                             style={styles.bookingCard} 
                             activeOpacity={0.7}
-                            onPress={() => router.push({ // Añadir onPress para navegar
-                                pathname: '/booking-detail',
-                                params: { bookingId: booking.id }
-                            })}
+                            onPress={() => router.push({ pathname: '/booking-detail', params: { bookingId: booking.id } })}
                         >
                         <View style={styles.bookingHeader}>
-                            <Text style={styles.bookingType}>{serviceName}</Text>
-                            <View style={[styles.statusBadgeBase, statusInfo.badge]}>
-                                <Text style={[styles.statusTextBase, statusInfo.text]}>{statusInfo.label}</Text>
+                            <Text style={styles.bookingType} numberOfLines={1}>{serviceName}</Text>
+                            <View style={[styles.statusBadgeBase, statusInfo.style]}>
+                                <Text style={styles.statusTextBase}>{statusInfo.label}</Text>
                             </View>
                         </View>
                         
@@ -177,11 +168,7 @@ export default function BookingsScreen() {
                             </View>
                             <View style={styles.detailRow}>
                                 <MapPin size={16} color={theme.colors.text.secondary} />
-                                <Text style={styles.detailText}>{
-                                  booking.location 
-                                  ? `${booking.location.address_line1}${booking.location.address_line2 ? ', '+booking.location.address_line2 : ''}`
-                                  : 'Dirección no especificada'
-                                }</Text>
+                                <Text style={styles.detailText} numberOfLines={1} ellipsizeMode="tail">{locationName}</Text>
                             </View>
                         </View>
                         </TouchableOpacity>
@@ -195,18 +182,22 @@ export default function BookingsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (theme) => StyleSheet.create({
   outerContainer: {
       flex: 1,
-      backgroundColor: theme?.colors?.background || '#f8f9fa',
+      backgroundColor: theme.colors.background,
   },
   container: {
     flex: 1,
   },
+  scrollContent: {
+      flexGrow: 1,
+      paddingBottom: theme.spacing.xl,
+  },
   header: {
-    padding: theme.spacing.lg,
-    paddingHorizontal: theme.spacing.xl,
+    paddingHorizontal: theme.spacing.lg,
     paddingTop: Platform.OS === 'android' ? theme.spacing.xl + 10 : 48,
+    paddingBottom: theme.spacing.md,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -217,10 +208,10 @@ const styles = StyleSheet.create({
   title: {
     ...theme.typography.h1,
     color: theme.colors.text.primary,
+    fontSize: 24,
   },
   addButton: {
     padding: theme.spacing.sm,
-    borderRadius: theme.borderRadius.full,
   },
   loader: {
       marginTop: 50,
@@ -228,51 +219,69 @@ const styles = StyleSheet.create({
   bookingsList: {
     padding: theme.spacing.lg,
     gap: theme.spacing.lg,
-    paddingBottom: theme.spacing.xl,
   },
   bookingCard: {
     backgroundColor: theme.colors.surface,
     borderRadius: theme.borderRadius.lg,
-    padding: theme.spacing.lg,
-    ...theme.shadows.md,
+    padding: theme.spacing.md,
+    ...theme.shadows.sm,
+     borderWidth: 1,
+     borderColor: theme.colors.border,
   },
   bookingHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: theme.spacing.md,
+    alignItems: 'flex-start',
+    marginBottom: theme.spacing.sm,
+    paddingBottom: theme.spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
   },
   bookingType: {
     ...theme.typography.h3,
     color: theme.colors.text.primary,
-    flexShrink: 1,
+    flex: 1,
     marginRight: theme.spacing.sm,
+    fontSize: 18,
   },
   statusBadgeBase: {
     paddingVertical: theme.spacing.xxs,
-    paddingHorizontal: theme.spacing.md,
+    paddingHorizontal: theme.spacing.sm,
     borderRadius: theme.borderRadius.full,
     alignSelf: 'flex-start',
   },
   statusTextBase: {
      ...theme.typography.caption,
-     fontWeight: '600',
+     fontWeight: 'bold',
+     fontSize: 12,
   },
-  pendingBadge: { backgroundColor: theme.colors.warningLight },
-  pendingText: { color: theme.colors.warning },
-  confirmedBadge: { backgroundColor: theme.colors.infoLight }, 
-  confirmedText: { color: theme.colors.info },
-  inProgressBadge: { backgroundColor: theme.colors.primaryLight },
-  inProgressText: { color: theme.colors.primary },
-  completedBadge: { backgroundColor: theme.colors.successLight },
-  completedText: { color: theme.colors.success },
-  cancelledBadge: { backgroundColor: theme.colors.errorLight },
-  cancelledText: { color: theme.colors.error },
-  statusBadge: { backgroundColor: theme.colors.border },
-  statusText: { color: theme.colors.text.secondary },
-  
+  pending: {
+      backgroundColor: theme.colors.warning + '20',
+      color: theme.colors.warning,
+  },
+  confirmed: {
+      backgroundColor: theme.colors.primary + '20',
+      color: theme.colors.primary,
+  },
+   inProgress: {
+      backgroundColor: theme.colors.info + '20',
+      color: theme.colors.info,
+  },
+  completed: {
+      backgroundColor: theme.colors.success + '20',
+      color: theme.colors.success,
+  },
+  cancelled: {
+      backgroundColor: theme.colors.error + '20',
+      color: theme.colors.error,
+  },
+  defaultStatus: {
+      backgroundColor: theme.colors.border,
+      color: theme.colors.text.secondary,
+  },
   bookingDetails: {
-    gap: theme.spacing.sm,
+    marginTop: theme.spacing.sm,
+    gap: theme.spacing.xs,
   },
   detailRow: {
     flexDirection: 'row',
@@ -280,7 +289,7 @@ const styles = StyleSheet.create({
     gap: theme.spacing.sm,
   },
   detailText: {
-    ...theme.typography.body,
+    ...theme.typography.body2,
     color: theme.colors.text.secondary,
     flexShrink: 1,
   },
@@ -289,23 +298,23 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: theme.spacing.xl,
-    minHeight: 200,
+    marginTop: -50,
   },
   noBookingsText: {
     ...theme.typography.body,
     color: theme.colors.text.secondary,
-    marginBottom: theme.spacing.lg,
     textAlign: 'center',
+    marginBottom: theme.spacing.lg,
   },
-  requestButton: {
-    backgroundColor: theme.colors.primary,
-    paddingVertical: theme.spacing.lg,
-    paddingHorizontal: theme.spacing.xl,
-    borderRadius: theme.borderRadius.lg,
-    ...theme.shadows.md,
+  requestButtonSmall: {
+      backgroundColor: theme.colors.primary,
+      paddingVertical: theme.spacing.sm,
+      paddingHorizontal: theme.spacing.lg,
+      borderRadius: theme.borderRadius.lg,
   },
   requestButtonText: {
-    ...theme.typography.button,
-    color: theme.colors.surface,
+      ...theme.typography.button,
+      color: theme.colors.surface,
+      fontSize: 14,
   }
 });

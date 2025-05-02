@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, StyleSheet, BackHandler, ToastAndroid } from 'react-native';
 import { Tabs, useFocusEffect, useRouter } from 'expo-router';
-import { theme } from '../theme';
+import { useTheme } from '../../constants/ThemeContext';
 import { Home, Calendar, MapPin, Bell, User } from 'lucide-react-native';
 import { supabase } from '../../lib/supabase';
 
@@ -16,6 +16,8 @@ const NotificationBadge = () => (
 );
 
 export default function TabLayout() {
+  const { theme } = useTheme();
+  const styles = getStyles(theme);
   const [userId, setUserId] = useState(null);
   const [hasUnreadNotifications, setHasUnreadNotifications] = useState(false);
   const router = useRouter();
@@ -185,8 +187,8 @@ export default function TabLayout() {
   );
 }
 
-// Estilos para el badge
-const styles = StyleSheet.create({
+// Estilos para el badge - Convertido a función que recibe theme
+const getStyles = (theme) => StyleSheet.create({
   badgeContainer: {
     position: 'absolute',
     right: -6, // Ajusta posición horizontal

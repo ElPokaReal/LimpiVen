@@ -1,11 +1,13 @@
 import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native';
-import { theme } from '../theme';
+import { useTheme } from '../../constants/ThemeContext';
 import { useRouter } from 'expo-router';
 import { Briefcase } from 'lucide-react-native';
 
 // Este es ahora el dashboard principal para el grupo (employee)
 export default function EmployeeDashboardIndex() { 
   const router = useRouter();
+  const { theme } = useTheme();
+  const styles = getStyles(theme);
 
   const navigateToAcceptedServices = () => {
     router.push('/accepted-services');
@@ -17,11 +19,8 @@ export default function EmployeeDashboardIndex() {
          <Text style={styles.title}>Dashboard</Text>
       </View>
 
-      {/* Contenido del Dashboard */}
       <View style={styles.content}>
-          {/* Puedes añadir más elementos al dashboard aquí */}
-          
-          {/* Botón para Servicios Aceptados */}
+
           <TouchableOpacity 
             style={styles.dashboardButton}
             onPress={navigateToAcceptedServices}
@@ -30,15 +29,13 @@ export default function EmployeeDashboardIndex() {
             <Briefcase size={24} color={theme.colors.primary} />
             <Text style={styles.buttonText}>Mis Servicios Aceptados</Text>
           </TouchableOpacity>
-          
-          {/* Otros botones o información */}
 
       </View>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (theme) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: theme.colors.background,

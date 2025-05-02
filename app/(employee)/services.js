@@ -2,12 +2,14 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Platform, RefreshControl } from 'react-native';
 import { Clock, MapPin, User, ChevronRight } from 'lucide-react-native'; // Importar iconos necesarios
 import { useRouter } from 'expo-router';
-import { theme } from '../theme';
+import { useTheme } from '../../constants/ThemeContext'; // Importar hook
 import { supabase } from '../../lib/supabase';
 import Toast from 'react-native-toast-message';
 
 export default function EmployeeServices() {
   const router = useRouter();
+  const { theme } = useTheme(); // Obtener theme
+  const styles = getStyles(theme); // Pasar theme a la función de estilos
   const [pendingBookings, setPendingBookings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -111,7 +113,6 @@ export default function EmployeeServices() {
     <View style={styles.outerContainer}>
       <View style={styles.header}>
         <Text style={styles.title}>Nuevos Servicios</Text>
-        {/* Podrías añadir un botón de filtro o similar aquí */}
       </View>
 
       <ScrollView
@@ -176,7 +177,7 @@ export default function EmployeeServices() {
 }
 
 // --- Estilos (Adaptados para un look profesional) ---
-const styles = StyleSheet.create({
+const getStyles = (theme) => StyleSheet.create({
   outerContainer: {
     flex: 1,
     backgroundColor: theme.colors.background,

@@ -1,6 +1,6 @@
 import { Tabs, useRouter, useFocusEffect } from 'expo-router';
 import { Home, Briefcase, User } from 'lucide-react-native';
-import { theme } from '../theme'; // Asegúrate que la ruta a theme es correcta
+import { useTheme } from '../../constants/ThemeContext'; // Importar el hook
 import { BackHandler, ToastAndroid } from 'react-native'; // Añadir BackHandler, ToastAndroid
 import { useCallback } from 'react'; // Añadir useCallback
 
@@ -9,6 +9,7 @@ let backPressedTimeEmployee = 0; // Usar variable diferente para evitar conflict
 
 export default function EmployeeTabLayout() {
   const router = useRouter(); // Obtener router
+  const { theme } = useTheme(); // Obtener el tema del contexto
 
   // Manejo del Botón Atrás en Android para Empleado
   useFocusEffect(
