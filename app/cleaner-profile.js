@@ -69,6 +69,11 @@ export default function CleanerProfileScreen() {
 
       if (reviewsError) throw reviewsError;
       
+      // ---- DEBUGGING ----
+      console.log("[CleanerProfile] Reseñas recibidas de Supabase:", reviewsData);
+      console.log("[CleanerProfile] Conteo de reseñas:", count);
+      // ---- FIN DEBUGGING ----
+
       setReviews(reviewsData || []);
       setReviewCount(count || 0);
 

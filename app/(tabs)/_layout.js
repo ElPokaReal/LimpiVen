@@ -8,12 +8,12 @@ import { supabase } from '../../lib/supabase';
 // Variable para rastrear el último tiempo de presionar atrás
 let backPressedTime = 0;
 
-// Componente para el punto rojo (badge)
-const NotificationBadge = () => (
-  <View style={styles.badgeContainer}>
-    <View style={styles.badge} />
-  </View>
-);
+// // Componente para el punto rojo (badge) - MOVIDO
+// const NotificationBadge = () => (
+//   <View style={styles.badgeContainer}>
+//     <View style={styles.badge} />
+//   </View>
+// );
 
 export default function TabLayout() {
   const { theme } = useTheme();
@@ -21,6 +21,13 @@ export default function TabLayout() {
   const [userId, setUserId] = useState(null);
   const [hasUnreadNotifications, setHasUnreadNotifications] = useState(false);
   const router = useRouter();
+
+  // Componente para el punto rojo (badge) - DEFINIDO AQUÍ AHORA
+  const NotificationBadge = () => (
+    <View style={styles.badgeContainer}>
+      <View style={styles.badge} />
+    </View>
+  );
 
   // 1. Obtener ID del usuario
   useEffect(() => {
@@ -169,9 +176,9 @@ export default function TabLayout() {
         options={{
           title: 'Notificaciones',
           tabBarIcon: ({ color, size }) => (
-            <View> 
+            <View>
               <Bell color={color} size={size} />
-              {hasUnreadNotifications && <NotificationBadge />} 
+              {hasUnreadNotifications && <NotificationBadge />}
             </View>
           ),
         }}
