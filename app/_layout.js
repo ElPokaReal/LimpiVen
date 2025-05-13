@@ -208,7 +208,8 @@ function RootLayoutNav() {
           'accepted-services',
           'service-history',
           'request-service',
-          'appearance'
+          'appearance',
+          'service-details'
           // Agrega más rutas aquí si las tienes directamente bajo /app y no dentro de (tabs) o (employee)
         ];
 
@@ -286,6 +287,7 @@ function RootLayoutNav() {
          <Stack.Screen name="(auth)" />
          <Stack.Screen name="(tabs)" />
          <Stack.Screen name="(employee)" />
+         <Stack.Screen name="service-details" />
       </Stack>
     </SafeAreaView>
   );

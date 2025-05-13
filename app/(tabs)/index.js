@@ -1,5 +1,5 @@
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, RefreshControl } from 'react-native';
-import { Clock, Star, Sparkles } from 'lucide-react-native';
+import { Clock, Star, Sparkles, Check, ChevronRight } from 'lucide-react-native';
 import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useTheme } from '../../constants/ThemeContext';
@@ -22,8 +22,8 @@ export default function HomeScreen() {
   }, []);
 
   const navigateToService = (serviceType) => {
-    console.log("Navigating to service request for:", serviceType);
-    router.push('/request-service');
+    console.log("Navigating to service details for:", serviceType);
+    router.push({ pathname: '/service-details', params: { serviceType: serviceType } });
   };
 
   const displayName = userDetails?.full_name;
@@ -47,65 +47,71 @@ export default function HomeScreen() {
         <Text style={styles.subtitle}>¿Qué servicio necesitas hoy?</Text>
       </View>
 
-      <View style={styles.servicesGrid}>
-        <TouchableOpacity style={styles.serviceCard} onPress={() => navigateToService('regular')} activeOpacity={0.8}>
-          <Image 
-            source={{ uri: 'https://images.unsplash.com/photo-1527515637462-cff94eecc1ac?w=500' }}
-            style={styles.serviceImage}
-          />
-          <Text style={styles.serviceTitle}>Limpieza Regular</Text>
-          <View style={styles.serviceInfo}>
-            <Clock size={16} color={theme.colors.text.secondary} />
-            <Text style={styles.serviceDetail}>2-3 horas</Text>
-          </View>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.serviceCard} onPress={() => navigateToService('deep')} activeOpacity={0.8}>
-          <Image 
-            source={{ uri: 'https://images.unsplash.com/photo-1584820927498-cfe5211fd8bf?w=500' }}
-            style={styles.serviceImage}
-          />
-          <Text style={styles.serviceTitle}>Limpieza Profunda</Text>
-          <View style={styles.serviceInfo}>
-            <Clock size={16} color={theme.colors.text.secondary} />
-            <Text style={styles.serviceDetail}>4-6 horas</Text>
-          </View>
-        </TouchableOpacity>
-      </View>
-
+      {/* Sección de Paquetes Vertical */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Servicios Destacados</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.featuredServicesScroll}>
-          <TouchableOpacity style={styles.featuredCard} onPress={() => navigateToService('office')} activeOpacity={0.8}>
-            <Image 
-              source={{ uri: 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=500' }}
-              style={styles.featuredImage}
-            />
-            <View style={styles.featuredContent}>
-              <View style={styles.featuredBadge}>
-                <Star size={12} color={theme.colors.primary} />
-                <Text style={styles.featuredBadgeText}>Popular</Text>
-              </View>
-              <Text style={styles.featuredTitle}>Limpieza de Oficinas</Text>
-              <Text style={styles.featuredPrice}>Desde $299</Text>
+        <Text style={styles.packageHeading}>Nuestros Paquetes de Limpieza</Text>
+        
+        <View style={styles.packagesContainerVertical}>
+          {/* Paquete Básico */}
+          <TouchableOpacity 
+            style={[styles.packageCardVertical, styles.basicPackageBorder]} 
+            onPress={() => navigateToService('basic')} 
+            activeOpacity={0.8}
+          >
+            <View style={styles.packageHeaderVertical}>
+              <Text style={styles.packageTitleVertical}>Básico</Text>
+              <Text style={styles.packagePriceVertical}>$35</Text>
+            </View>
+            <View style={styles.packageFeaturesVertical}>
+              <Text style={styles.packageFeatureText}>Limpieza de baños y cocina.</Text>
+              <Text style={styles.packageFeatureText}>Aspirado general.</Text>
+            </View>
+            <View style={styles.packageFooter}>
+              <Text style={styles.packageLink}>Conoce más</Text>
+              <ChevronRight size={18} color={theme.colors.primary} />
             </View>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.featuredCard} onPress={() => navigateToService('post-event')} activeOpacity={0.8}>
-            <Image 
-              source={{ uri: 'https://images.unsplash.com/photo-1527515862127-a4fc05baf7a5?w=500' }}
-              style={styles.featuredImage}
-            />
-            <View style={styles.featuredContent}>
-              <View style={[styles.featuredBadge, styles.specialBadge]}>
-                <Sparkles size={12} color={theme.colors.secondary} />
-                <Text style={[styles.featuredBadgeText, styles.specialBadgeText]}>Nuevo</Text>
-              </View>
-              <Text style={styles.featuredTitle}>Limpieza Post-Evento</Text>
-              <Text style={styles.featuredPrice}>Desde $399</Text>
+          {/* Paquete Mediano */}
+          <TouchableOpacity 
+            style={[styles.packageCardVertical, styles.mediumPackageBorder]} 
+            onPress={() => navigateToService('medium')} 
+            activeOpacity={0.8}
+          >
+            <View style={styles.packageHeaderVertical}>
+              <Text style={styles.packageTitleVertical}>Mediano</Text>
+              <Text style={[styles.packagePriceVertical, { color: theme.colors.secondary }]}>$50</Text>
+            </View>
+            <View style={styles.packageFeaturesVertical}>
+              <Text style={styles.packageFeatureText}>Incluye Básico + Limpieza de ventanas.</Text>
+              <Text style={styles.packageFeatureText}>Organización ligera.</Text>
+            </View>
+             <View style={styles.packageFooter}>
+              <Text style={styles.packageLink}>Conoce más</Text>
+              <ChevronRight size={18} color={theme.colors.secondary} />
             </View>
           </TouchableOpacity>
-        </ScrollView>
+
+          {/* Paquete Premium */}
+          <TouchableOpacity 
+            style={[styles.packageCardVertical, styles.premiumPackageStyle]} 
+            onPress={() => navigateToService('premium')} 
+            activeOpacity={0.8}
+          >
+            <View style={styles.packageHeaderVertical}>
+              <Text style={[styles.packageTitleVertical, styles.premiumText]}>Premium</Text>
+              <Text style={[styles.packagePriceVertical, styles.premiumPriceText]}>$90</Text>
+            </View>
+            <View style={styles.packageFeaturesVertical}>
+              <Text style={[styles.packageFeatureText, styles.premiumText]}>Incluye Mediano + Limpieza profunda.</Text>
+              <Text style={[styles.packageFeatureText, styles.premiumText]}>Desinfección completa.</Text>
+            </View>
+             <View style={styles.packageFooter}>
+              <Text style={[styles.packageLink, styles.premiumLink]}>Conoce más</Text>
+              <ChevronRight size={18} color={theme.colors.surface} />
+            </View>
+          </TouchableOpacity>
+        </View>
       </View>
       <Toast />
     </ScrollView>
@@ -118,7 +124,7 @@ const getStyles = (theme) => StyleSheet.create({
     backgroundColor: theme.colors.background,
   },
   scrollContent: {
-    paddingBottom: theme.spacing.lg,
+    paddingBottom: theme.spacing.xxl,
   },
   header: {
     padding: theme.spacing.xl,
@@ -127,6 +133,7 @@ const getStyles = (theme) => StyleSheet.create({
     borderBottomLeftRadius: theme.borderRadius.xl,
     borderBottomRightRadius: theme.borderRadius.xl,
     ...theme.shadows.md,
+    marginBottom: theme.spacing.lg,
   },
   greeting: {
     ...theme.typography.h1,
@@ -134,16 +141,121 @@ const getStyles = (theme) => StyleSheet.create({
     fontSize: 28,
   },
   subtitle: {
-    ...theme.typography.body1,
-    color: theme.colors.surface + 'B3',
+    ...theme.typography.body,
+    color: theme.colors.surface + 'D0',
     marginTop: theme.spacing.xs,
+  },
+  section: {
+    paddingHorizontal: theme.spacing.lg,
+    paddingTop: theme.spacing.sm,
+    paddingBottom: theme.spacing.lg,
+  },
+  packageHeading: {
+    ...theme.typography.h2,
+    color: theme.colors.text.primary,
+    marginBottom: theme.spacing.lg,
+    fontSize: 22,
+    textAlign: 'left',
+  },
+  packagesContainerVertical: {
+    flexDirection: 'column',
+    gap: theme.spacing.md,
+  },
+  packageCardVertical: {
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.borderRadius.lg,
+    padding: theme.spacing.lg,
+    ...theme.shadows.sm,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  basicPackageBorder: {
+     borderLeftColor: theme.colors.primary,
+     borderLeftWidth: 5,
+  },
+  mediumPackageBorder: {
+     borderLeftColor: theme.colors.secondary,
+     borderLeftWidth: 5,
+  },
+  premiumPackageStyle: {
+    backgroundColor: theme.colors.primary,
+    borderColor: theme.colors.primary,
+    position: 'relative',
+     borderLeftColor: theme.colors.accent,
+     borderLeftWidth: 5,
+  },
+  premiumBadge: {
+    position: 'absolute',
+    top: theme.spacing.md,
+    right: theme.spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.colors.accent + 'E0',
+    paddingVertical: theme.spacing.xs,
+    paddingHorizontal: theme.spacing.sm,
+    borderRadius: theme.borderRadius.full,
+    gap: theme.spacing.xs,
+    zIndex: 1,
+  },
+  premiumBadgeText: {
+    ...theme.typography.caption,
+    color: theme.colors.surface,
+    fontWeight: '600',
+    fontSize: 12,
+  },
+  packageHeaderVertical: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: theme.spacing.md,
+  },
+  packageTitleVertical: {
+    ...theme.typography.h2,
+    color: theme.colors.text.primary,
+    fontSize: 20,
+    flexShrink: 1,
+    marginRight: theme.spacing.sm,
+  },
+  packagePriceVertical: {
+    ...theme.typography.h2,
+    color: theme.colors.primary,
+    fontWeight: '700',
+    fontSize: 20,
+    textAlign: 'right',
+  },
+  premiumText: {
+    color: theme.colors.surface,
+  },
+  premiumPriceText: {
+    color: theme.colors.surface,
+  },
+  packageFeaturesVertical: {
+    marginBottom: theme.spacing.md,
+    gap: theme.spacing.xs,
+  },
+  packageFeatureText: {
+    ...theme.typography.body,
+    color: theme.colors.text.secondary,
+    lineHeight: 22,
+  },
+  packageFooter: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'flex-end',
+      marginTop: theme.spacing.sm,
+      gap: theme.spacing.xs,
+  },
+  packageLink: {
+      ...theme.typography.button,
+      color: theme.colors.primary,
+      fontSize: 14,
+      fontWeight: '500',
   },
   servicesGrid: {
     flexDirection: 'row',
     paddingHorizontal: theme.spacing.lg,
     paddingVertical: theme.spacing.lg,
     gap: theme.spacing.md,
-    marginTop: -theme.spacing.xl,
   },
   serviceCard: {
     flex: 1,
@@ -156,7 +268,7 @@ const getStyles = (theme) => StyleSheet.create({
   },
   serviceImage: {
     width: '100%',
-    height: 120,
+    height: 100,
     borderRadius: theme.borderRadius.md,
     marginBottom: theme.spacing.md,
   },
@@ -170,28 +282,25 @@ const getStyles = (theme) => StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: theme.spacing.xs,
+    marginTop: 'auto',
   },
   serviceDetail: {
-    ...theme.typography.body2,
+    ...theme.typography.caption,
     color: theme.colors.text.secondary,
-  },
-  section: {
-    paddingHorizontal: theme.spacing.lg,
-    paddingTop: theme.spacing.md,
-    paddingBottom: theme.spacing.lg,
   },
   sectionTitle: {
     ...theme.typography.h2,
     color: theme.colors.text.primary,
     marginBottom: theme.spacing.md,
-    fontSize: 20,
+    fontSize: 22,
+    textAlign: 'left',
   },
   featuredServicesScroll: {
     marginHorizontal: -theme.spacing.lg,
     paddingHorizontal: theme.spacing.lg,
   },
   featuredCard: {
-    width: 280,
+    width: 260,
     marginRight: theme.spacing.md,
     backgroundColor: theme.colors.surface,
     borderRadius: theme.borderRadius.lg,
@@ -202,7 +311,7 @@ const getStyles = (theme) => StyleSheet.create({
   },
   featuredImage: {
     width: '100%',
-    height: 160,
+    height: 140,
   },
   featuredContent: {
     padding: theme.spacing.md,
@@ -211,9 +320,6 @@ const getStyles = (theme) => StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: theme.colors.primary + '20',
-    paddingVertical: theme.spacing.xxs,
-    paddingHorizontal: theme.spacing.sm,
-    backgroundColor: '#F3E5F5',
     paddingVertical: 4,
     paddingHorizontal: 8,
     borderRadius: 16,
@@ -223,24 +329,27 @@ const getStyles = (theme) => StyleSheet.create({
   },
   featuredBadgeText: {
     fontSize: 12,
-    color: '#6200EE',
+    color: theme.colors.primary,
     fontWeight: '500',
   },
   specialBadge: {
-    backgroundColor: '#E8EAF6',
+    backgroundColor: theme.colors.secondary + '20',
   },
   specialBadgeText: {
-    color: '#3F51B5',
+    color: theme.colors.secondary,
   },
   featuredTitle: {
+    ...theme.typography.h3,
+    color: theme.colors.text.primary,
+    marginBottom: 4,
     fontSize: 18,
-    fontWeight: '600',
-    color: '#212121',
-    marginBottom: 8,
   },
   featuredPrice: {
-    fontSize: 16,
-    color: '#6200EE',
-    fontWeight: '500',
+    ...theme.typography.body,
+    color: theme.colors.primary,
+    fontWeight: '600',
+  },
+  premiumLink: {
+    color: theme.colors.surface + 'D0',
   },
 });

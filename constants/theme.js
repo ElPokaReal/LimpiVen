@@ -1,21 +1,21 @@
 // Define el tema claro (anteriormente 'theme')
 export const lightTheme = {
   colors: {
-    primary: '#5D5FEF',
-    secondary: '#FF6584',
-    accent: '#00C9A7',
-    background: '#F8F9FA', // Fondo claro
-    surface: '#FFFFFF',    // Superficies claras (cards, etc.)
+    primary: '#4A7AFF',       // Azul principal más similar al logo
+    secondary: '#2D4899',     // Azul oscuro como el "ven" del logo
+    accent: '#33C9FF',        // Azul claro complementario
+    background: '#F8F9FA',    // Fondo claro
+    surface: '#FFFFFF',       // Superficies claras (cards, etc.)
     text: {
-      primary: '#2D3436',   // Texto oscuro sobre fondo claro
-      secondary: '#636E72',
-      light: '#B2BEC3',
+      primary: '#2D3748',     // Texto oscuro sobre fondo claro
+      secondary: '#4A5568',
+      light: '#A0AEC0',
       placeholder: '#A0A0A0',
     },
-    border: '#E0E0E0',
+    border: '#E2E8F0',
     error: '#FF5252',
-    success: '#4CAF50',
-    warning: '#FFC107',
+    success: '#38B2AC',       // Verde azulado
+    warning: '#F6AD55',       // Naranja suave
   },
   spacing: {
     xs: 4,
@@ -103,32 +103,55 @@ export const lightTheme = {
 
 // Define el tema oscuro
 export const darkTheme = {
-  // Hereda spacing, borderRadius, typography y shadows (puedes sobreescribirlos si es necesario)
-  ...lightTheme, // Empieza con los valores del tema claro para no repetir todo
+  // Hereda spacing, borderRadius, typography y shadows
+  ...lightTheme,
   colors: {
-    // Sobreescribe solo los colores
-    primary: '#8F90F3',    // <-- Nuevo azul primario (oscuro)
-    secondary: '#FF8A9F', // Mantenido y ajustado para modo oscuro
-    accent: '#2CE6C1',    // Mantenido y ajustado para modo oscuro
-    background: '#121212', // Fondo oscuro principal
-    surface: '#1E1E1E',    // Superficies oscuras (cards, etc.)
+    primary: '#6D92FF',       // Azul claro como "Limpi" pero para fondo oscuro
+    secondary: '#3B5BC9',     // Azul medio-oscuro
+    accent: '#00B4FF',        // Azul brillante acentuado
+    background: '#0F172A',    // Fondo azul muy oscuro
+    surface: '#1E2A4A',       // Superficies azul oscuro
     text: {
-      primary: '#E1E1E1',   // Texto claro sobre fondo oscuro
-      secondary: '#A8A8A8',
-      light: '#757575',
-      placeholder: '#AAAAAA',
+      primary: '#E2E8F0',     // Texto claro sobre fondo oscuro
+      secondary: '#A0AEC0',
+      light: '#718096',
+      placeholder: '#4A5568',
     },
-    border: '#2D2D2D',    // Bordes oscuros
-    error: '#FF7C7C',    // Ajustado
-    success: '#7EDD81',   // Ajustado
-    warning: '#FFD85A',   // Ajustado
+    border: '#2D3748',        // Bordes azul oscuro
+    error: '#FC8181',         // Rojo más suave para modo oscuro
+    success: '#4FD1C5',       // Verde azulado más brillante
+    warning: '#F6AD55',       // Naranja suave
   },
-  // Ejemplo: podrías querer desactivar o cambiar las sombras en modo oscuro
-  /*
   shadows: {
-    sm: { elevation: 0, shadowOpacity: 0 }, // Sin sombra
-    md: { elevation: 0, shadowOpacity: 0 },
-    lg: { elevation: 0, shadowOpacity: 0 },
-  }
-  */
+    sm: {
+      shadowColor: '#000',
+      shadowOffset: {
+        width: 0,
+        height: 2,
+      },
+      shadowOpacity: 0.3,     // Sombra más pronunciada para modo oscuro
+      shadowRadius: 4,
+      elevation: 3,
+    },
+    md: {
+      shadowColor: '#000',
+      shadowOffset: {
+        width: 0,
+        height: 4,
+      },
+      shadowOpacity: 0.35,    // Sombra más pronunciada para modo oscuro
+      shadowRadius: 8,
+      elevation: 5,
+    },
+    lg: {
+      shadowColor: '#000',
+      shadowOffset: {
+        width: 0,
+        height: 6,
+      },
+      shadowOpacity: 0.4,     // Sombra más pronunciada para modo oscuro
+      shadowRadius: 12,
+      elevation: 7,
+    },
+  },
 }; 
